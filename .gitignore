@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+firmware/.pio/
+firmware/src/secrets.h
+.env
+.env.*.local
+*.log
+.DS_Store
+.claude
+.npm-cache/
+.playwright-cli/
+.env.*
+!.env.example

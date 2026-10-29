@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+/**
+ * Identidade visual oficial do SIVA.
+ *
+ * Tokens nomeados = paleta oficial (fonte da verdade).
+ * Escala `siva-*` = variações derivadas, usadas para fundos, superfícies e contraste.
+ */
+@theme {
+  /* Paleta oficial */
+  --color-yale-blue: #00487c;
+  --color-cool-sky: #4bb3fd;
+  --color-blue-slate: #3e6680;
+  --color-dodger-blue: #0496ff;
+  --color-bright-teal-blue: #027bce;
+
+  /* Escala derivada */
+  --color-siva-50: #f2f8fd;
+  --color-siva-100: #e2f1fc;
+  --color-siva-200: #bcdff7;
+  --color-siva-300: #84c6f1;
+  --color-siva-400: #4bb3fd;
+  --color-siva-500: #0496ff;
+  --color-siva-600: #027bce;
+  --color-siva-700: #00487c;
+  --color-siva-800: #003c68;
+  --color-siva-900: #002b4d;
+  --color-siva-950: #00182c;
+
+  /* Tipografia */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background-color: var(--color-white);
+    color: var(--color-slate-700);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-slate-900);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-bright-teal-blue);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-siva-600);
+    color: var(--color-white);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,45 @@
+# Ambiente local de desenvolvimento: API + MySQL.
+# Para o time de frontend que não precisa de banco, basta rodar a API com
+# MOCK_MODE=true (veja README) — o compose aqui é só para quem for mexer
+# na camada de persistência de verdade.
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: siva_db
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - '3306:3306'
+    volumes:
+      - siva_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-proot']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: build
+    command: sh -c "npx prisma migrate deploy && npm run dev"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      MOCK_MODE: 'false'
+      DATABASE_URL: mysql://root:root@mysql:3306/siva_db
+      JWT_SECRET: dev-secret-nao-use-em-producao
+      CORS_ORIGIN: '*'
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - siva_node_modules:/app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  siva_mysql_data:
+  siva_node_modules:

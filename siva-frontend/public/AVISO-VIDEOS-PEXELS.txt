@@ -1,0 +1,30 @@
+Abertura cinematográfica SIVA — fontes e créditos da filmagem
+===============================================================
+
+O site utiliza a logo original do projeto e filmagens reais de água gratuitas
+sob a Licença Pexels (https://www.pexels.com/license/).
+
+1) Queda d'água:
+   Marc Onana, "Close Up Video of a Waterfall"
+   https://www.pexels.com/video/close-up-video-of-a-waterfall-5762682/
+   URL de mídia:
+   https://videos.pexels.com/video-files/5762682/5762682-hd_1920_1080_25fps.mp4
+
+2) Respingos na água:
+   cottonbro studio, "High-Speed Photography of Water Splash Against Black Background"
+   https://www.pexels.com/video/high-speed-photography-of-water-splash-against-black-background-9667668/
+   URL de mídia:
+   https://videos.pexels.com/video-files/9667668/9667668-hd_1920_1080_25fps.mp4
+
+IMPORTANTE: Os arquivos MP4 NÃO estão incluídos no ZIP: são reproduzidos
+pelo CDN Pexels. O efeito com vídeo exige conexão com a internet.
+A página mantém visual escuro com a logo quando os vídeos não carregam.
+
+Para ter uma versão 100% independente de CDN:
+ - Baixe os dois vídeos nas páginas acima, observando a licença aplicável.
+ - Coloque-os em siva-frontend/public/media/quedagua.mp4 e respingos.mp4
+ - No arquivo src/features/landing/media/footage.ts, substitua waterfall
+   por '/media/quedagua.mp4' e impact por '/media/respingos.mp4'.
+
+A revelação final da logo é um efeito de composição do navegador sincronizado
+com as filmagens. Não é uma simulação volumétrica 3D de colisão entre água e logo.

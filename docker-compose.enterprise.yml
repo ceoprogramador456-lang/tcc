@@ -1,0 +1,52 @@
+# Variante "enterprise": API atrás de um reverse proxy (Caddy, com TLS
+# automático) e MySQL persistente, pensada para uma primeira implantação em
+# produção/homologação. Uso:
+#   docker compose -f docker-compose.enterprise.yml up -d --build
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: siva_db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD}
+    volumes:
+      - siva_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-p$$MYSQL_ROOT_PASSWORD']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MOCK_MODE: 'false'
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/siva_db
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - siva_caddy_data:/data
+      - siva_caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  siva_mysql_data:
+  siva_caddy_data:
+  siva_caddy_config:

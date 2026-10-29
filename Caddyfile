@@ -1,0 +1,11 @@
+# Substitua pelo domínio real da API em produção.
+:80 {
+	encode gzip
+
+	reverse_proxy api:3000
+
+	log {
+		output stdout
+		format console
+	}
+}
