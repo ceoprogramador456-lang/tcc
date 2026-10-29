@@ -210,3 +210,5 @@ Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de branches/PR e [docs/DEVE
 ## 📄 Licença
 
 Projeto acadêmico desenvolvido para fins de TCC.
+
+Repositorio do TCC: https://github.com/ceoprogramador456-lang/tcc
