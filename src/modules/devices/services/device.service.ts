@@ -86,6 +86,10 @@ export const deviceService = {
     const current = await this.getAccessible(user, id);
 
     if (data.espId !== undefined && data.espId !== current.espId) {
+      if (current.macAddress)
+        throw new ConflictError(
+          'A identificação de uma placa pareada vem do MAC e não pode ser alterada.',
+        );
       await this.assertEspIdAvailable(data.espId, id);
     }
 
@@ -94,7 +98,7 @@ export const deviceService = {
       await this.assertSensoresNoSetorDestino(id, data.setorId);
     }
 
-    // O token nunca é alterado por edição — trocar exige recriar o dispositivo.
+    // Edição não altera a credencial; placas pareadas usam o fluxo de novo pareamento.
     const device = await repository.update(id, data);
     if (!device) throw new NotFoundError('Dispositivo ESP32');
     return device;
@@ -102,7 +106,12 @@ export const deviceService = {
 
   async remove(user: AuthenticatedUser, id: number) {
     await this.getAccessible(user, id);
-    await repository.remove(id);
+    const { total } = await createSensorRepository().list({ filter: { esp32Id: id }, pageSize: 1 });
+    if (total > 0)
+      throw new ConflictError(
+        'O dispositivo possui sensores vinculados. Use novo pareamento para preservar o histórico.',
+      );
+    if (!(await repository.remove(id))) throw new NotFoundError('Dispositivo ESP32');
   },
 
   async assertEspIdAvailable(espId: string, ignoreId?: number): Promise<void> {

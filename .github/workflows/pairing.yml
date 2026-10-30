@@ -1,0 +1,52 @@
+name: ESP32 integration
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: integration-only
+          MYSQL_DATABASE: siva_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pintegration-only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: mysql://root:integration-only@127.0.0.1:3306/siva_test
+      JWT_SECRET: integration-test-secret-only
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            siva-frontend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run test:mysql
+      - run: npm ci
+        working-directory: siva-frontend
+      - run: npm run lint && npm run build
+        working-directory: siva-frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: siva-frontend
+      - run: npm run test:e2e
+        working-directory: siva-frontend
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install platformio
+      - run: pio run -d firmware

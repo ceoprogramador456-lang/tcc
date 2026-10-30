@@ -11,6 +11,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   JWT_SECRET: z.string().min(8).default('troque-este-valor-em-producao'),
   JWT_EXPIRES_IN: z.string().default('8h'),
+  DEVICE_PAIRING_SECRET: z.string().min(32).optional(),
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
@@ -27,6 +28,10 @@ if (!parsed.success) {
 if (!parsed.data.MOCK_MODE && !parsed.data.DATABASE_URL) {
   console.error('DATABASE_URL é obrigatório quando MOCK_MODE=false.');
   throw new Error('Falha ao carregar configuração de ambiente.');
+}
+
+if (parsed.data.NODE_ENV === 'production' && !parsed.data.DEVICE_PAIRING_SECRET) {
+  throw new Error('DEVICE_PAIRING_SECRET (mínimo 32 caracteres) é obrigatório em produção.');
 }
 
 export const env = parsed.data;

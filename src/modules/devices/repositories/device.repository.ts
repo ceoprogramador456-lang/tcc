@@ -21,6 +21,8 @@ export type DeviceRepository = CrudRepository<Device, CreateDeviceInput, UpdateD
 function buildWhere(filter: Record<string, unknown>) {
   const where: Record<string, unknown> = {};
   if (filter.id !== undefined) where.id = Number(filter.id);
+  if (filter.espId !== undefined) where.espId = filter.espId;
+  if (filter.macAddress !== undefined) where.macAddress = filter.macAddress;
   if (filter.setorId !== undefined) where.setorId = normalizeIdFilter(filter.setorId);
   if (filter.setorIds !== undefined) where.setorId = normalizeIdFilter(filter.setorIds);
   return where;
@@ -59,16 +61,18 @@ const prismaRepository: DeviceRepository = {
   async update(id, data) {
     try {
       return await prisma.esp32.update({ where: { id: Number(id) }, data });
-    } catch {
-      return null;
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2025') return null;
+      throw error;
     }
   },
   async remove(id) {
     try {
       await prisma.esp32.delete({ where: { id: Number(id) } });
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2025') return false;
+      throw error;
     }
   },
   async findByTokenHash(tokenHash) {
@@ -84,6 +88,8 @@ const mockRepository: DeviceRepository = {
   async create(data) {
     return devicesMock.create({
       ...data,
+      macAddress: null,
+      pairingEnabled: false,
       descricao: data.descricao ?? null,
       ultimoContato: null,
       criadoEm: new Date(),

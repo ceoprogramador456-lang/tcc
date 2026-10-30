@@ -8,7 +8,7 @@ import { env } from './config/env.js';
 import { requestLogger } from './middlewares/request-logger.middleware.js';
 import { errorHandler } from './middlewares/error-handler.middleware.js';
 import { notFoundMiddleware } from './middlewares/not-found.middleware.js';
-import { apiRoutes } from './routes/index.js';
+import { createApiRoutes } from './routes/index.js';
 import { docsRoutes } from './docs/docs.routes.js';
 
 export function createApp() {
@@ -39,7 +39,7 @@ export function createApp() {
   );
 
   app.use('/docs', docsRoutes);
-  app.use('/api', apiRoutes);
+  app.use('/api', createApiRoutes());
 
   app.use(notFoundMiddleware);
   app.use(errorHandler);

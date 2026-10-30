@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    exclude: ['tests/mysql/**'],
     env: {
       NODE_ENV: 'test',
       MOCK_MODE: 'true',

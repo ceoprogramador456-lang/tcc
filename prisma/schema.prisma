@@ -116,6 +116,8 @@ model Esp32 {
   id             Int       @id @default(autoincrement())
   setorId        Int       @map("setor_id")
   espId          String    @unique @map("esp_id") @db.VarChar(50)
+  macAddress     String?   @unique @map("mac_address") @db.VarChar(17)
+  pairingEnabled Boolean   @default(false) @map("pairing_enabled")
   tokenHash      String    @unique @map("token_hash") @db.Char(64)
   descricao      String?   @db.VarChar(100)
   ultimoContato  DateTime? @map("ultimo_contato")
@@ -123,8 +125,25 @@ model Esp32 {
 
   setor   Setor    @relation(fields: [setorId], references: [id])
   sensores Sensor[]
+  pareamentos DevicePairing[]
 
   @@map("esp32")
+}
+
+model DevicePairing {
+  id          String   @id @db.VarChar(36)
+  macAddress  String   @unique @map("mac_address") @db.VarChar(17)
+  sensorId    String   @map("sensor_id") @db.VarChar(50)
+  secretHash  String   @map("secret_hash") @db.Char(64)
+  codeHash    String   @unique @map("code_hash") @db.Char(64)
+  status      String   @default("PENDING") @db.VarChar(16)
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  deviceId    Int?     @map("device_id")
+  device      Esp32?   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("device_pairing")
 }
 
 model Sensor {

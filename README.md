@@ -40,7 +40,8 @@ O backend segue organização feature-modular (`src/modules/<recurso>/{controlle
 
 **Firmware (ESP32)**
 - C/C++ (Arduino)
-- Estrutura modular: `main.ino`, `config.h`, `sensor.h`, `display.h`, `wifi_manager.h`
+- Estrutura modular: `main.ino`, `config.h`, `sensor.h`, `display.h`, `provisioning.h`, `api_client.h`
+- Wi-Fi configurado por USB, código de pareamento no OLED e credencial entregue à placa após aprovação no painel.
 
 **Backend**
 - Node.js 22+, TypeScript, ESM
@@ -146,10 +147,8 @@ autenticado por `X-Token`) sem hardware:
 npm run simulate:esp32
 ```
 
-```bash
-# Firmware
-# Abrir main.ino na Arduino IDE, configurar Wi-Fi em wifi_manager.h e fazer upload para o ESP32
-```
+Para instalar uma placa real, siga [o guia de pareamento ESP32](docs/ESP32_PAIRING.md).
+O firmware usa PlatformIO, sem portal Wi-Fi e sem copiar identificador ou token manualmente.
 
 ## 📜 Scripts disponíveis
 

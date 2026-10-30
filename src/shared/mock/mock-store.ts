@@ -132,6 +132,8 @@ function seed(): void {
   const espProducao = devices.create({
     setorId: producao.id,
     espId: 'esp_01',
+    macAddress: null,
+    pairingEnabled: false,
     tokenHash: hashDeviceToken('dev-token-esp01'),
     descricao: 'ESP32 fixado no quadro elétrico da produção.',
     ultimoContato: hoursAgo(0.1),
@@ -140,6 +142,8 @@ function seed(): void {
   const espResfriamento = devices.create({
     setorId: resfriamento.id,
     espId: 'esp_02',
+    macAddress: null,
+    pairingEnabled: false,
     tokenHash: hashDeviceToken('dev-token-esp02'),
     descricao: 'ESP32 na casa de bombas do resfriamento.',
     ultimoContato: hoursAgo(0.5),
@@ -148,6 +152,8 @@ function seed(): void {
   const espLimpeza = devices.create({
     setorId: limpeza.id,
     espId: 'esp_03',
+    macAddress: null,
+    pairingEnabled: false,
     tokenHash: hashDeviceToken('dev-token-esp03'),
     descricao: 'ESP32 na linha CIP.',
     ultimoContato: hoursAgo(2),

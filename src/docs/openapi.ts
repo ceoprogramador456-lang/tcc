@@ -1,3 +1,5 @@
+import { pairingPaths } from './pairing.openapi.js';
+
 const bearerAuth = { bearerAuth: [] as string[] };
 const xTokenAuth = { xTokenAuth: [] as string[] };
 
@@ -68,6 +70,7 @@ export const openApiDocument = {
     { name: 'Sectors' },
     { name: 'Assets' },
     { name: 'Devices' },
+    { name: 'Pairing' },
     { name: 'Sensors' },
     { name: 'Readings' },
     { name: 'Maintenances' },
@@ -78,6 +81,13 @@ export const openApiDocument = {
     securitySchemes: {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       xTokenAuth: { type: 'apiKey', in: 'header', name: 'X-Token' },
+      pairingKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Pairing-Key',
+        description:
+          'Segredo aleatório de 32 bytes em hexadecimal minúsculo, gerado e salvo pela placa. Nunca é o código do OLED.',
+      },
     },
     schemas: {
       Company: {
@@ -120,6 +130,8 @@ export const openApiDocument = {
           id: { type: 'integer' },
           setorId: { type: 'integer' },
           espId: { type: 'string' },
+          macAddress: { type: 'string', nullable: true },
+          pairingEnabled: { type: 'boolean' },
           descricao: { type: 'string', nullable: true },
           ultimoContato: { type: 'string', format: 'date-time', nullable: true },
           online: {
@@ -289,6 +301,7 @@ export const openApiDocument = {
     },
   },
   paths: {
+    ...pairingPaths,
     '/health': {
       get: {
         tags: ['Alerts'],
