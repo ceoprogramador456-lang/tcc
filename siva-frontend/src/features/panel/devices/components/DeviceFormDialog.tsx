@@ -88,7 +88,7 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
       title={isEditing ? 'Editar dispositivo' : 'Cadastrar dispositivo'}
       description={
         isEditing
-          ? 'O token de acesso do firmware não é alterado aqui — nem reaparece após a criação.'
+          ? 'Altere a descrição e o setor. Para renovar a credencial, use Novo pareamento.'
           : 'O token de acesso é gerado pelo servidor e exibido uma única vez, ao final do cadastro.'
       }
       size="sm"
@@ -115,7 +115,7 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
           error={errors.espId}
           placeholder="esp_01"
           hint="Usado no payload enviado pelo firmware."
-          disabled={isSaving}
+          disabled={isSaving || Boolean(device?.macAddress)}
         />
 
         <SelectField

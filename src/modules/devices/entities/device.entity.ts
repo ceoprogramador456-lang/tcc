@@ -2,6 +2,8 @@ export interface Device {
   id: number;
   setorId: number;
   espId: string;
+  macAddress: string | null;
+  pairingEnabled: boolean;
   /** SHA-256 do token de acesso — o token em claro nunca é persistido. */
   tokenHash: string;
   descricao: string | null;

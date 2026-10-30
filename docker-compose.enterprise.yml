@@ -27,6 +27,7 @@ services:
       MOCK_MODE: 'false'
       DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/siva_db
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      DEVICE_PAIRING_SECRET: ${DEVICE_PAIRING_SECRET:?defina DEVICE_PAIRING_SECRET}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
     command: sh -c "npx prisma migrate deploy && node dist/server.js"
     depends_on:

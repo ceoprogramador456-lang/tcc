@@ -11,21 +11,27 @@ import { readingRoutes } from '../modules/readings/routes/reading.routes.js';
 import { maintenanceRoutes } from '../modules/maintenances/routes/maintenance.routes.js';
 import { alertRoutes } from '../modules/alerts/routes/alert.routes.js';
 import { dashboardRoutes } from '../modules/dashboard/routes/dashboard.routes.js';
+import { createPairingRoutes } from '../modules/pairings/routes/pairing.routes.js';
 
-export const apiRoutes = Router();
+export function createApiRoutes() {
+  const apiRoutes = Router();
 
-apiRoutes.get('/health', (_req, res) => {
-  res.json({ success: true, data: { status: 'ok', mockMode: env.MOCK_MODE, env: env.NODE_ENV } });
-});
+  apiRoutes.get('/health', (_req, res) => {
+    res.json({ success: true, data: { status: 'ok', mockMode: env.MOCK_MODE, env: env.NODE_ENV } });
+  });
 
-apiRoutes.use('/auth', authRoutes);
-apiRoutes.use('/users', userRoutes);
-apiRoutes.use('/companies', companyRoutes);
-apiRoutes.use('/sectors', sectorRoutes);
-apiRoutes.use('/assets', assetRoutes);
-apiRoutes.use('/devices', deviceRoutes);
-apiRoutes.use('/sensors', sensorRoutes);
-apiRoutes.use('/readings', readingRoutes);
-apiRoutes.use('/maintenances', maintenanceRoutes);
-apiRoutes.use('/alerts', alertRoutes);
-apiRoutes.use('/dashboard', dashboardRoutes);
+  apiRoutes.use('/auth', authRoutes);
+  apiRoutes.use('/users', userRoutes);
+  apiRoutes.use('/companies', companyRoutes);
+  apiRoutes.use('/sectors', sectorRoutes);
+  apiRoutes.use('/assets', assetRoutes);
+  apiRoutes.use('/devices', deviceRoutes);
+  apiRoutes.use('/device-pairings', createPairingRoutes());
+  apiRoutes.use('/sensors', sensorRoutes);
+  apiRoutes.use('/readings', readingRoutes);
+  apiRoutes.use('/maintenances', maintenanceRoutes);
+  apiRoutes.use('/alerts', alertRoutes);
+  apiRoutes.use('/dashboard', dashboardRoutes);
+
+  return apiRoutes;
+}

@@ -130,7 +130,13 @@ Content-Type: application/json
 
 Erros possíveis: `401 UNAUTHORIZED` (sem token), `403 FORBIDDEN` (usuário tentando criar setor em empresa que não é a sua), `422 VALIDATION_ERROR` (`nome` ausente/curto, `empresaId` ausente).
 
-### 3. Criar um ESP32 (token só aparece aqui)
+### 3. Criar um ESP32 (cadastro legado por API)
+
+Para placas com o firmware atual, use o [pareamento USB + OLED](ESP32_PAIRING.md):
+`POST /api/device-pairings/request`, `/lookup`, `/approve`, `/status` e `/acknowledge`.
+A credencial é entregue somente à placa. Novo pareamento usa
+`POST /api/device-pairings/devices/:id/reset`, com JWT de ADMIN/GESTOR e escopo de empresa.
+O contrato abaixo continua disponível para integração legada.
 
 ```http
 POST /api/devices

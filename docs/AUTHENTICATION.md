@@ -90,3 +90,6 @@ sequenceDiagram
 - Não existe endpoint de **auto-registro**: usuários só são criados por um `ADMIN` via `POST /api/users` (ver regras em [BUSINESS_FLOWS.md](./BUSINESS_FLOWS.md#usuário)).
 - Não existe fluxo de "esqueci minha senha" (envio de e-mail, token de reset). A única forma de trocar senha hoje é `PATCH /api/users/:id` (somente ADMIN) enviando o campo `senha`.
 - 🚧 **Não implementado nesta etapa**: recuperação de senha por e-mail, MFA/2FA, refresh token (o cliente reloga quando o JWT expira).
+# Pareamento automático ESP32
+
+O novo firmware usa [USB + OLED](ESP32_PAIRING.md). `X-Pairing-Key` autentica a sessão temporária da placa; o código no OLED confirma a seleção no painel. Após aprovação, a placa recebe o `X-Token` e o guarda na NVS. O navegador não recebe esse token. As seções de criação manual permanecem como referência do contrato legado.

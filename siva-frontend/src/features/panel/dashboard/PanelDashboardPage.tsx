@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { AlertMessage } from '../../../components/ui/AlertMessage';
 import { Button } from '../../../components/ui/Button';
 import { LoadingBlock } from '../../../components/ui/LoadingBlock';
+import { usePolling } from '../../../hooks/use-polling';
 import { useAsyncData } from '../../../hooks/use-async-data';
 import { dashboardService } from '../../../services/dashboard/dashboard.service';
 import { formatDateTime } from '../../../utils/format';
@@ -26,6 +27,8 @@ export default function PanelDashboardPage() {
     },
     `${session?.token ?? ''}:${empresaId ?? 'todas'}`,
   );
+
+  usePolling(reload, Boolean(session));
 
   if (!session) return null;
 

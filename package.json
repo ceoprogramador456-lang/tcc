@@ -27,7 +27,8 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "simulate:esp32": "tsx scripts/simulate-esp32.ts",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "test:mysql": "vitest run --config vitest.mysql.config.ts"
   },
   "lint-staged": {
     "*.{ts,js,mjs}": [

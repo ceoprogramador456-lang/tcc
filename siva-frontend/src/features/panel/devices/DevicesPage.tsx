@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Radio, RefreshCw, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Radio, RefreshCw, Trash2, Link2 } from 'lucide-react';
 
 import { AlertMessage } from '../../../components/ui/AlertMessage';
 import { Badge } from '../../../components/ui/Badge';
@@ -23,7 +23,9 @@ import { usePanelLayout } from '../layout/panel-layout-context';
 import { usePanelScope } from '../hooks/use-panel-scope';
 import { usePermissions } from '../hooks/use-permissions';
 import { DeviceFormDialog } from './components/DeviceFormDialog';
-import { DeviceTokenDialog } from './components/DeviceTokenDialog';
+import { PairDeviceDialog } from './components/PairDeviceDialog';
+import { pairingService } from '../../../services/devices/pairing.service';
+import { usePolling } from '../../../hooks/use-polling';
 
 const PAGE_SIZE = 10;
 
@@ -41,7 +43,9 @@ export default function DevicesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [revealedToken, setRevealedToken] = useState<{ token: string; espId: string } | null>(null);
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [resetDevice, setResetDevice] = useState<Device | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   const { data: sectors } = useAsyncData(
     () => {
@@ -68,6 +72,8 @@ export default function DevicesPage() {
     `${session?.token ?? ''}:${page}:${empresaId ?? 'todas'}:${filterSetorId}`,
   );
 
+  usePolling(reload, Boolean(session));
+
   if (!session) return null;
 
   const sectorName = new Map<number, string>(
@@ -79,14 +85,27 @@ export default function DevicesPage() {
       await deviceService.update(session.token, editing.id, payload);
       setActionSuccess(`Dispositivo "${payload.espId}" atualizado.`);
       setIsFormOpen(false);
-    } else {
-      // O token volta uma única vez, na resposta de criação.
-      const created = await deviceService.create(session.token, payload);
-      setActionSuccess(`Dispositivo "${created.espId}" cadastrado.`);
-      setIsFormOpen(false);
-      setRevealedToken({ token: created.token, espId: created.espId });
     }
     reload();
+  };
+
+  const handleReset = async () => {
+    if (!resetDevice) return;
+    setResetting(true);
+    try {
+      await pairingService.reset(session.token, resetDevice.id);
+      setResetDevice(null);
+      setActionSuccess(
+        'Novo pareamento autorizado. Aguarde o novo código no OLED e clique em Conectar ESP32.',
+      );
+      reload();
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : 'Não foi possível reiniciar o pareamento.',
+      );
+    } finally {
+      setResetting(false);
+    }
   };
 
   const handleDelete = async (): Promise<void> => {
@@ -124,6 +143,9 @@ export default function DevicesPage() {
               {device.espId}
             </p>
             <p className="truncate text-xs text-slate-500">{device.descricao ?? 'Sem descrição'}</p>
+            {device.macAddress ? (
+              <p className="font-mono text-xs text-slate-500">{device.macAddress}</p>
+            ) : null}
           </div>
         </div>
       ),
@@ -141,7 +163,7 @@ export default function DevicesPage() {
       render: (device) => (
         <div className="flex flex-col items-start gap-1">
           <Badge tone={device.online ? 'success' : 'warning'}>
-            {device.online ? 'Online' : 'Offline'}
+            {device.pairingEnabled ? 'Aguardando pareamento' : device.online ? 'Online' : 'Offline'}
           </Badge>
           <span className="text-xs text-slate-500">
             {device.ultimoContato
@@ -163,6 +185,17 @@ export default function DevicesPage() {
       render: (device) =>
         canWrite ? (
           <div className="flex items-center justify-end gap-1">
+            {device.macAddress ? (
+              <button
+                type="button"
+                aria-label={`Novo pareamento de ${device.espId}`}
+                title="Novo pareamento"
+                onClick={() => setResetDevice(device)}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-sky-50"
+              >
+                <Link2 className="size-4" aria-hidden="true" />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -194,7 +227,7 @@ export default function DevicesPage() {
     <>
       <PanelTopbar
         title="Dispositivos"
-        description="Consulte os aparelhos que enviam leituras e configure sua identificação"
+        description="Conecte placas pelo código do OLED e acompanhe o envio das leituras"
         onOpenMenu={openMenu}
         showScopeSelector
         actions={
@@ -209,13 +242,12 @@ export default function DevicesPage() {
             {canWrite ? (
               <Button
                 onClick={() => {
-                  setEditing(null);
                   setActionError(null);
-                  setIsFormOpen(true);
+                  setPairingOpen(true);
                 }}
               >
                 <Plus className="size-4" aria-hidden="true" />
-                Cadastrar dispositivo
+                Conectar ESP32
               </Button>
             ) : null}
           </>
@@ -277,7 +309,7 @@ export default function DevicesPage() {
                 <EmptyState
                   icon={Radio}
                   title="Nenhum dispositivo encontrado"
-                  description="Cadastre um dispositivo e vincule seus sensores para receber leituras de vazão."
+                  description="Ligue a placa configurada por USB e use Conectar ESP32 com o código exibido no OLED."
                 />
               }
             />
@@ -303,11 +335,29 @@ export default function DevicesPage() {
         onSubmit={handleSubmit}
       />
 
-      <DeviceTokenDialog
-        open={revealedToken !== null}
-        token={revealedToken?.token ?? null}
-        espId={revealedToken?.espId ?? null}
-        onClose={() => setRevealedToken(null)}
+      {pairingOpen ? (
+        <PairDeviceDialog
+          key={empresaId ?? 'all'}
+          token={session.token}
+          empresaId={empresaId}
+          onClose={() => setPairingOpen(false)}
+          onPaired={() => {
+            setPairingOpen(false);
+            setActionSuccess(
+              'Pareamento aprovado. A placa receberá a credencial e enviará a primeira leitura automaticamente.',
+            );
+            reload();
+          }}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={resetDevice !== null}
+        title="Autorizar novo pareamento"
+        description="A credencial atual será revogada e a placa mostrará um novo código. O histórico e os vínculos serão preservados."
+        confirmLabel="Autorizar novo pareamento"
+        isLoading={resetting}
+        onConfirm={() => void handleReset()}
+        onCancel={() => setResetDevice(null)}
       />
 
       <ConfirmDialog

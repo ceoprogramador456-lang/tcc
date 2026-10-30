@@ -1,45 +1,35 @@
 #pragma once
-
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
-
 #include "config.h"
 
 inline Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
-
+inline bool displayReady = false;
 inline bool setupDisplay() {
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS)) {
-    Serial.println("Falha ao iniciar o display OLED SSD1306");
-    return false;
-  }
-  display.clearDisplay();
-  display.display();
-  return true;
+  Wire.begin(21, 22);
+  displayReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS);
+  if (!displayReady) Serial.println("OLED indisponivel. O codigo tambem aparece no USB.");
+  return displayReady;
 }
-
-// Tela de texto simples, usada para status de boot e instruções do portal Wi-Fi.
 inline void showMessage(const char* title, const char* line1, const char* line2) {
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println(title);
-  display.println();
-  display.println(line1);
-  display.println(line2);
-  display.display();
+  if (!displayReady) return;
+  display.clearDisplay(); display.setTextSize(1); display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0); display.println(title); display.println();
+  display.println(line1); display.println(line2); display.display();
 }
-
-inline void showReading(float vazao, bool wifiConnected) {
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.printf("SIVA - %s\n", ESP_ID);
-  display.printf("Wi-Fi: %s\n", wifiConnected ? "conectado" : "offline");
-  display.println();
-  display.setTextSize(2);
-  display.printf("%.2f L/min", vazao);
-  display.display();
+inline void showPairing(const String& code) {
+  if (!displayReady) return;
+  display.clearDisplay(); display.setTextColor(SSD1306_WHITE); display.setTextSize(1);
+  display.setCursor(0, 0); display.println("SIVA - pareamento");
+  display.setCursor(0, 22); display.setTextSize(2);
+  display.print(code.substring(0, 4)); display.print('-'); display.print(code.substring(4));
+  display.setTextSize(1); display.setCursor(0, 52); display.print("Aprove no painel"); display.display();
+}
+inline void showReading(float flow, bool delivered) {
+  if (!displayReady) return;
+  display.clearDisplay(); display.setTextColor(SSD1306_WHITE); display.setTextSize(1);
+  display.setCursor(0, 0); display.println("SIVA - monitorando");
+  display.println(delivered ? "API: leitura recebida" : "API: envio pendente");
+  display.setCursor(0, 36); display.setTextSize(2); display.printf("%.2f L/min", flow); display.display();
 }

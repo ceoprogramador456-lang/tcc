@@ -12,6 +12,8 @@ export interface Device {
   id: number;
   setorId: number;
   espId: string;
+  macAddress: string | null;
+  pairingEnabled: boolean;
   descricao: string | null;
   ultimoContato: string | null;
   criadoEm: string;
