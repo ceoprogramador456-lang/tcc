@@ -70,6 +70,18 @@ export function PanelSidebar({ isOpen, onClose }: PanelSidebarProps) {
   const adminItems =
     user?.tipo === 'ADMIN' ? ADMIN_NAV_ITEMS.filter((item) => item.to !== '/painel') : [];
 
+  /**
+   * O ADMIN não acessa as telas operacionais de "Visão geral" e "Equipamentos";
+   * "Solicitações" fica restrita ao GESTOR.
+   */
+  const panelItems = PANEL_NAV_ITEMS.filter((item) => {
+    if (item.to === '/painel/solicitacoes' && user?.tipo !== 'GESTOR') return false;
+    if (user?.tipo === 'ADMIN' && (item.to === '/painel' || item.to === '/painel/ativos')) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <>
       {isOpen ? (
@@ -106,7 +118,7 @@ export function PanelSidebar({ isOpen, onClose }: PanelSidebarProps) {
           aria-label="Navegação do painel operacional"
         >
           <ul className="space-y-1">
-            {PANEL_NAV_ITEMS.map((item) => (
+            {panelItems.map((item) => (
               <li key={item.to}>
                 <SidebarLink item={item} onClose={onClose} />
               </li>

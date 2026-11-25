@@ -1,4 +1,4 @@
-import { Activity, Building, LayoutDashboard, Users } from 'lucide-react';
+import { Activity, Building, ClipboardList, LayoutDashboard, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -35,5 +35,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: 'Usuários e acessos',
     description: 'Contas de acesso e perfis',
     icon: Users,
+  },
+  {
+    to: '/admin/solicitacoes',
+    label: 'Solicitações de serviço',
+    description: 'Revisão e aceite das solicitações de manutenção',
+    icon: ClipboardList,
   },
 ];

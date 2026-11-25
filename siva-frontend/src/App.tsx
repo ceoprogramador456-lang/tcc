@@ -31,6 +31,17 @@ const UsersPage = lazy(() =>
 );
 const CompanyUsersPage = lazy(() => import('./features/panel/users/CompanyUsersPage'));
 
+const AdminSolicitacoesPage = lazy(() =>
+  import('./features/admin/ordem-servico/SolicitacoesServicoPage').then((m) => ({
+    default: m.default,
+  })),
+);
+const PanelSolicitacoesPage = lazy(() =>
+  import('./features/panel/ordem-servico/SolicitacoesServicoPage').then((m) => ({
+    default: m.default,
+  })),
+);
+
 const PanelDashboardPage = lazy(() =>
   import('./features/panel/dashboard/PanelDashboardPage').then((m) => ({ default: m.default })),
 );
@@ -102,6 +113,14 @@ export default function App() {
             </Suspense>
           }
         />
+        <Route
+          path="solicitacoes"
+          element={
+            <Suspense fallback={<Fallback />}>
+              <AdminSolicitacoesPage />
+            </Suspense>
+          }
+        />
       </Route>
 
       {/* Área operacional — qualquer usuário autenticado. */}
@@ -160,6 +179,14 @@ export default function App() {
           element={
             <Suspense fallback={<Fallback />}>
               <PanelSensorsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="solicitacoes"
+          element={
+            <Suspense fallback={<Fallback />}>
+              <PanelSolicitacoesPage />
             </Suspense>
           }
         />

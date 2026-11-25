@@ -237,7 +237,7 @@ export default function SectorsPage() {
       <SectorFormDialog
         open={isFormOpen}
         sector={editing}
-        empresaId={empresaId ?? session.user.empresaId}
+        empresaId={editing ? editing.empresaId : empresaId}
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleSubmit}
       />
