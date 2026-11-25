@@ -11,6 +11,7 @@ import { readingRoutes } from '../modules/readings/routes/reading.routes.js';
 import { maintenanceRoutes } from '../modules/maintenances/routes/maintenance.routes.js';
 import { alertRoutes } from '../modules/alerts/routes/alert.routes.js';
 import { dashboardRoutes } from '../modules/dashboard/routes/dashboard.routes.js';
+import { ordemServicoRoutes } from '../modules/ordemServico/routes/ordemServico.routes.js';
 
 export const apiRoutes = Router();
 
@@ -27,5 +28,6 @@ apiRoutes.use('/devices', deviceRoutes);
 apiRoutes.use('/sensors', sensorRoutes);
 apiRoutes.use('/readings', readingRoutes);
 apiRoutes.use('/maintenances', maintenanceRoutes);
+apiRoutes.use('/solicitacoes-servico', ordemServicoRoutes);
 apiRoutes.use('/alerts', alertRoutes);
 apiRoutes.use('/dashboard', dashboardRoutes);

@@ -12,6 +12,7 @@ dashboardRoutes.get('/admin-summary', authorize('ADMIN'), dashboardController.ad
 
 dashboardRoutes.get(
   '/overview',
+  authorize('GESTOR', 'TECNICO'),
   validate({ query: dashboardOverviewQuerySchema }),
   dashboardController.overview,
 );

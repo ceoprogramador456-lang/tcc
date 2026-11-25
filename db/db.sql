@@ -116,11 +116,36 @@ CREATE TABLE manutencao (
 );
 
 -- ============================================================
+-- ORDEM_SERVICO (solicitações de serviço — gestor solicita, admin aceita)
+-- ============================================================
+CREATE TABLE ordem_servico (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    tipo ENUM('preventiva', 'corretiva', 'inspecao') NOT NULL,
+    descricao TEXT,
+    status ENUM('aberto', 'em_andamento', 'concluido') DEFAULT 'aberto',
+    empresa_id INT NOT NULL,
+    solicitante_id INT NOT NULL,
+    funcionario_id INT NULL,
+    aceito_por INT NULL,
+    aceito_em DATETIME NULL,
+    concluido_em DATETIME NULL,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NOT NULL,
+    FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+    FOREIGN KEY (solicitante_id) REFERENCES usuario(id),
+    FOREIGN KEY (funcionario_id) REFERENCES usuario(id),
+    FOREIGN KEY (aceito_por) REFERENCES usuario(id)
+);
+
+-- ============================================================
 -- ÍNDICES (performance para consultas frequentes)
 -- ============================================================
 CREATE INDEX idx_leitura_sensor_data ON leitura (sensor_id, registrado_em);
 CREATE INDEX idx_manutencao_status ON manutencao (status);
 CREATE INDEX idx_ativo_criticidade ON ativo (criticidade);
+CREATE INDEX idx_ordem_servico_status ON ordem_servico (status);
+CREATE INDEX idx_ordem_servico_empresa ON ordem_servico (empresa_id);
 
 INSERT INTO usuario (
     nome,

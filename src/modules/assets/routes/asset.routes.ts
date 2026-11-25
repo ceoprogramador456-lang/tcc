@@ -13,7 +13,12 @@ export const assetRoutes = Router();
 
 assetRoutes.use(authenticateUser);
 
-assetRoutes.get('/', validate({ query: listAssetsQuerySchema }), assetController.list);
+assetRoutes.get(
+  '/',
+  authorize('GESTOR', 'TECNICO'),
+  validate({ query: listAssetsQuerySchema }),
+  assetController.list,
+);
 assetRoutes.get('/:id', validate({ params: assetIdParamSchema }), assetController.getById);
 assetRoutes.post(
   '/',

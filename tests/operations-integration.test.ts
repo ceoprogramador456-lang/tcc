@@ -128,12 +128,17 @@ describe('Escopo multiempresa dos recursos operacionais', () => {
     tecnicoToken = await tokenDe(TECNICO.email, TECNICO.senha);
   });
 
-  it('ADMIN lista ativos e dispositivos de todas as empresas', async () => {
-    const assets = await request(app)
+  it('ADMIN não acessa ativos — GESTOR enxerga os da própria empresa', async () => {
+    const assetsAdmin = await request(app)
       .get('/api/assets')
       .set('Authorization', `Bearer ${adminToken}`);
+    expect(assetsAdmin.status).toBe(403);
+
+    const assets = await request(app)
+      .get('/api/assets')
+      .set('Authorization', `Bearer ${gestorToken}`);
     expect(assets.status).toBe(200);
-    expect(assets.body.meta.total).toBeGreaterThanOrEqual(3);
+    expect(assets.body.meta.total).toBe(2);
 
     const devices = await request(app)
       .get('/api/devices')
@@ -260,7 +265,7 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
   it('devolve indicadores calculados a partir dos dados reais', async () => {
     const response = await request(app)
       .get('/api/dashboard/overview')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${gestorToken}`);
 
     expect(response.status).toBe(200);
     const data = response.body.data;
@@ -268,10 +273,10 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
     // Os totais do painel precisam bater com a listagem de sensores.
     const sensors = await request(app)
       .get('/api/sensors?pageSize=100')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${gestorToken}`);
     const devices = await request(app)
       .get('/api/devices?pageSize=100')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${gestorToken}`);
 
     expect(data.sensores.total).toBe(sensors.body.meta.total);
     expect(data.esp32.total).toBe(devices.body.meta.total);
@@ -288,8 +293,9 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
   it('alertas vem como indisponível (sem fonte de dados), nunca como número', async () => {
     const response = await request(app)
       .get('/api/dashboard/overview')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${gestorToken}`);
 
+    expect(response.status).toBe(200);
     expect(response.body.data.alertas.disponivel).toBe(false);
     expect(response.body.data.alertas.total).toBeNull();
   });
@@ -297,7 +303,7 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
   it('atividades são eventos registrados, não registros inventados', async () => {
     const response = await request(app)
       .get('/api/dashboard/overview')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${gestorToken}`);
 
     const atividades = response.body.data.atividades;
     expect(Array.isArray(atividades)).toBe(true);
@@ -310,6 +316,20 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
     }
   });
 
+  it('ADMIN não acessa o painel operacional; GESTOR vê os indicadores', async () => {
+    const admin = await request(app)
+      .get('/api/dashboard/overview')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(admin.status).toBe(403);
+
+    const response = await request(app)
+      .get('/api/dashboard/overview')
+      .set('Authorization', `Bearer ${gestorToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.sensores.total).toBeGreaterThan(0);
+  });
+
   it('respeita o escopo da empresa do usuário (GESTOR)', async () => {
     const response = await request(app)
       .get('/api/dashboard/overview')
@@ -317,14 +337,11 @@ describe('Dashboard operacional (GET /api/dashboard/overview)', () => {
 
     expect(response.status).toBe(200);
 
-    const admin = await request(app)
-      .get('/api/dashboard/overview')
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    // O painel do gestor enxerga um subconjunto do painel global.
-    expect(response.body.data.sensores.total).toBeLessThan(admin.body.data.sensores.total);
+    const sensors = await request(app)
+      .get('/api/sensors')
+      .set('Authorization', `Bearer ${gestorToken}`);
+    expect(response.body.data.sensores.total).toBe(sensors.body.meta.total);
     expect(response.body.data.sensores.total).toBeGreaterThan(0);
-    expect(response.body.data.esp32.total).toBeLessThan(admin.body.data.esp32.total);
   });
 
   it('GESTOR não consegue consultar o painel de outra empresa (403)', async () => {
