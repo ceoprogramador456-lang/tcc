@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Building, Eye, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import { AlertMessage } from '../../../components/ui/AlertMessage';
+import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { DataTable } from '../../../components/ui/DataTable';
@@ -96,7 +97,10 @@ export default function CompaniesPage() {
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-siva-50 text-bright-teal-blue">
             <Building className="size-4" aria-hidden="true" />
           </span>
-          <span className="font-semibold text-slate-900">{company.nome}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900">{company.nome}</span>
+            {company.tipo === 'SIVA' ? <Badge tone="brand">SIVA</Badge> : null}
+          </span>
         </div>
       ),
     },
@@ -124,24 +128,30 @@ export default function CompaniesPage() {
           >
             <Eye className="size-4" aria-hidden="true" />
           </Link>
-          <button
-            type="button"
-            onClick={() => handleOpenEdit(company)}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-siva-50 hover:text-bright-teal-blue"
-            aria-label={`Editar ${company.nome}`}
-            title="Editar"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setCompanyToDelete(company)}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
-            aria-label={`Excluir ${company.nome}`}
-            title="Excluir"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </button>
+          {company.tipo === 'SIVA' ? (
+            <span className="px-2 text-xs text-slate-400">Protegida</span>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => handleOpenEdit(company)}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-siva-50 hover:text-bright-teal-blue"
+                aria-label={`Editar ${company.nome}`}
+                title="Editar"
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompanyToDelete(company)}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                aria-label={`Excluir ${company.nome}`}
+                title="Excluir"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
       ),
     },

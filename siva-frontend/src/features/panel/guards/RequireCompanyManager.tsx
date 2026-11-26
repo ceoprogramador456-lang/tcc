@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/hooks/use-auth';
 export function RequireCompanyManager({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (user?.tipo === 'ADMIN') return <Navigate to="/admin/usuarios" replace />;
+  if (user?.tipo === 'TECNICO') return <Navigate to="/tecnico" replace />;
   if (user?.tipo !== 'GESTOR') return <Navigate to="/painel" replace />;
   return <>{children}</>;
 }

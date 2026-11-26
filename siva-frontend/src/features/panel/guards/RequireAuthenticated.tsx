@@ -29,6 +29,11 @@ export function RequireAuthenticated({ children }: RequireAuthenticatedProps) {
     return <Navigate to="/login" replace />;
   }
 
+  // O TECNICO possui área própria (somente suas ordens de serviço).
+  if (user?.tipo === 'TECNICO') {
+    return <Navigate to="/tecnico" replace />;
+  }
+
   // O ADMIN não acessa as telas operacionais de "Visão geral" e "Equipamentos".
   if (user?.tipo === 'ADMIN') {
     return <Navigate to="/admin/solicitacoes" replace />;
