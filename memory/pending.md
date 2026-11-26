@@ -17,6 +17,9 @@ construção do front-end (2026-10-21).
 
 8. Área do `GESTOR`/`TECNICO` no painel: o que cada perfil vê e edita
    (leituras de vazão, chamados/OS, ativos)? Sem isso o front cobre só ADMIN.
+   → RESOLVIDO 2026-11-26: `GESTOR` usa `/painel` (visão geral, setores, ativos,
+   dispositivos, sensores, solicitações e equipe); `TECNICO` da SIVA usa `/tecnico`
+   com uma única tela (OS designadas a ele).
 9. Refresh token / reautenticação: hoje o JWT expira em 8 h e o front volta ao login.
    Adotar refresh token no back-end ou aceitar? (ver PROB-013)
 10. Recuperação de senha e e-mail transacional: hoje só o ADMIN troca a senha
@@ -26,3 +29,11 @@ construção do front-end (2026-10-21).
 12. Tema claro/escuro: hoje há um tema claro (área admin) e um escuro (público/login).
     Unificar em um tema comutável?
 13. Idioma: interface 100% em pt-BR. Confirmar ou prever i18n?
+
+## Novos (2026-11-26)
+
+14. Nome da empresa nas respostas de OS: a área do técnico exibe `Empresa #id`
+    porque `TECNICO` não pode consultar `/companies`. Incluir `empresaNome` (ou
+    objeto resumido) em `GET /solicitacoes-servico`? (decisão de contrato)
+15. `TECNICO` acessa o detalhe da própria OS somente leitura; não há ação de
+    iniciar/concluir pelo técnico (aceite/conclusão continuam com o ADMIN).

@@ -5,8 +5,9 @@ Base: `docs/analise-regras-negocio.md` §19. Status único: Pendente.
 ## PROB-001 — `maintenances` sem `authorize` / sem dono
 - Descrição: rotas de escrita sem `authorize`; service não checa `funcionarioId == me` nem papel gestor.
 - Impacto: funcionário altera atividade de outro da mesma empresa.
-- Status: Parcialmente resolvido 2026-10-13 — `funcionarioId` agora validado (existe, ATIVO,
-  mesma empresa do sensor). Falta: dono (`== me`) e `authorize` na rota.
+- Status: **Resolvido 2026-11-26** — rotas exigem `ADMIN`/`GESTOR`; o service exige que o
+  executor seja `GESTOR` da empresa do sensor (manutenção interna da cliente). O `TECNICO`
+  da SIVA não acessa manutenções (bloqueado por `denyTecnico`).
 
 ## PROB-002 — `company.service` sem actor
 - Descrição: service não recebe ator/escopo para checagem de vínculo.

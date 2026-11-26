@@ -14,7 +14,8 @@ Este documento complementa a documentação interativa: com o servidor rodando, 
   ```json
   { "success": true, "data": [ ], "meta": { "total": 42, "page": 1, "pageSize": 20, "totalPages": 3 } }
   ```
-- **Tipos de usuário** — `ADMIN` (global, sem empresa) · `GESTOR` (empresa obrigatória, sem especialidade) · `TECNICO` (empresa + especialidade `MECANICO|ELETRICISTA` obrigatórias). Status `ATIVO|INATIVO` (inativo não faz login).
+- **Tipos de usuário** — `ADMIN` (global, vinculado à SIVA) · `GESTOR` (empresa cliente obrigatória, sem especialidade) · `TECNICO` (**exclusivo da SIVA** + especialidade `MECANICO|ELETRICISTA` obrigatória). Status `ATIVO|INATIVO` (inativo não faz login).
+  - Cadastro: empresa SIVA aceita `ADMIN|TECNICO`; empresa cliente aceita somente `GESTOR`; todo usuário tem empresa.
 - **Autenticação** — duas formas, nunca misturadas na mesma rota (ver [AUTHENTICATION.md](./AUTHENTICATION.md) para o fluxo completo):
   - `Authorization: Bearer <jwt>` — usuários do dashboard.
   - `X-Token: <token-do-dispositivo>` — só usado por `POST /api/readings` (o firmware do ESP32).
@@ -64,11 +65,17 @@ Este documento complementa a documentação interativa: com o servidor rodando, 
 | `DELETE` | `/api/sensors/:id` | Bearer | `ADMIN`, `GESTOR` | Remove sensor |
 | `GET` | `/api/readings` | Bearer | — | Histórico de leituras (`?sensorId=`, obrigatório) |
 | `POST` | `/api/readings` | **X-Token** | — | Ingestão de leitura pelo firmware do ESP32 |
-| `GET` | `/api/maintenances` | Bearer | — | Lista chamados (`?sensorId=`, obrigatório) |
-| `GET` | `/api/maintenances/:id` | Bearer | — | Detalhe de um chamado |
-| `POST` | `/api/maintenances` | Bearer | — | Abre chamado (status sempre `aberto`) |
-| `PATCH` | `/api/maintenances/:id` | Bearer | — | Atualiza status/descrição/responsável |
-| `DELETE` | `/api/maintenances/:id` | Bearer | — | Remove chamado |
+| `GET` | `/api/maintenances` | Bearer | `ADMIN`, `GESTOR` | Lista manutenções internas (`?sensorId=`, obrigatório) |
+| `GET` | `/api/maintenances/:id` | Bearer | `ADMIN`, `GESTOR` | Detalhe de uma manutenção |
+| `POST` | `/api/maintenances` | Bearer | `ADMIN`, `GESTOR` | Abre manutenção (executor deve ser GESTOR da empresa do sensor) |
+| `PATCH` | `/api/maintenances/:id` | Bearer | `ADMIN`, `GESTOR` | Atualiza status/descrição/responsável |
+| `DELETE` | `/api/maintenances/:id` | Bearer | `ADMIN`, `GESTOR` | Remove manutenção |
+| `GET` | `/api/solicitacoes-servico` | Bearer | `ADMIN`, `GESTOR`, `TECNICO` | Lista OS (ADMIN: todas; GESTOR: da empresa; TECNICO: só as designadas a ele) |
+| `GET` | `/api/solicitacoes-servico/:id` | Bearer | `ADMIN`, `TECNICO` | Detalhe da OS (TECNICO: somente a própria) |
+| `POST` | `/api/solicitacoes-servico` | Bearer | `GESTOR` | Cria OS na empresa do gestor (status `aberto`) |
+| `POST` | `/api/solicitacoes-servico/:id/aceitar` | Bearer | `ADMIN` | Aceita e designa um técnico ativo da SIVA |
+| `POST` | `/api/solicitacoes-servico/:id/concluir` | Bearer | `ADMIN` | Conclui uma OS `em_andamento` |
+| `PATCH` | `/api/solicitacoes-servico/:id` | Bearer | `ADMIN` | Troca o técnico responsável (`aberto`/`em_andamento`) |
 | `GET` | `/api/alerts` | Bearer | — | 🚧 Sempre `501 NOT_IMPLEMENTED` nesta etapa |
 
 ## Exemplos completos
@@ -173,7 +180,8 @@ Authorization: Bearer <jwt>
 
 - `setorId` **ou** `empresaId` são filtros opcionais. Sem nenhum deles, a listagem é da
   empresa do usuário autenticado (para `ADMIN`, o consolidado de todas).
-- Um `empresaId` de outra empresa resulta em `403` para `GESTOR`/`TECNICO`.
+- Um `empresaId` de outra empresa resulta em `403` para `GESTOR` (o `TECNICO` é bloqueado
+  nos módulos operacionais por `denyTecnico`).
 - O `online` de cada item reflete o último contato registrado.
 
 ### 4. Ingestão de leitura (firmware → API)
@@ -278,8 +286,8 @@ Authorization: Bearer <jwt>
 Regras de cálculo:
 
 - **Escopo:** a empresa do usuário autenticado. `ADMIN` pode filtrar por `?empresaId=`; sem o
-  parâmetro, vê o consolidado de todas as empresas. `GESTOR`/`TECNICO` com `empresaId` de
-  outra empresa recebem `403`.
+  parâmetro, vê o consolidado de todas as empresas. `GESTOR` com `empresaId` de
+  outra empresa recebe `403`; o `TECNICO` não acessa o dashboard.
 - **Consumo atual (L/min):** soma da última leitura de cada sensor **ativo** que reportou
   dentro das últimas 24 h. Sensores sem leitura no período ficam de fora e são sinalizados em
   `sensores.semLeituraNoPeriodo`.

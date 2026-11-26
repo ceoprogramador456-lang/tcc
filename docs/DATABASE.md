@@ -20,6 +20,7 @@ erDiagram
         int id PK
         varchar100 nome
         varchar20 cnpj UK "nullable"
+        enum tipo "SIVA | CLIENTE"
         datetime criado_em
     }
     USUARIO {
@@ -30,7 +31,7 @@ erDiagram
         enum tipo "ADMIN | GESTOR | TECNICO"
         enum especialidade "MECANICO | ELETRICISTA, nullable (obrigatória p/ TECNICO)"
         enum status "ATIVO | INATIVO, default ATIVO"
-        int empresa_id FK "NULL só p/ ADMIN"
+        int empresa_id FK "NOT NULL (ADMIN vinculado à SIVA)"
         datetime criado_em
     }
     SETOR {
@@ -112,6 +113,7 @@ Todo isolamento entre clientes (multi-tenant) deriva desta hierarquia: um recurs
 | `id` | `INT` | PK, auto-increment |
 | `nome` | `VARCHAR(100)` | `NOT NULL` |
 | `cnpj` | `VARCHAR(20)` | `UNIQUE`, nullable |
+| `tipo` | `ENUM('SIVA','CLIENTE')` | `NOT NULL`, default `CLIENTE` — SIVA usa o CNPJ reservado `00.000.000/0001-00` |
 | `criado_em` | `DATETIME` | default `CURRENT_TIMESTAMP` |
 
 ### `usuario`
@@ -122,10 +124,10 @@ Todo isolamento entre clientes (multi-tenant) deriva desta hierarquia: um recurs
 | `nome` | `VARCHAR(100)` | `NOT NULL` |
 | `email` | `VARCHAR(100)` | `UNIQUE`, `NOT NULL` |
 | `senha` | `VARCHAR(255)` | `NOT NULL` — hash bcrypt, nunca a senha em claro |
-| `tipo` | `ENUM('ADMIN','GESTOR','TECNICO')` | `NOT NULL` |
+| `tipo` | `ENUM('ADMIN','GESTOR','TECNICO')` | `NOT NULL` — `TECNICO` só existe em empresa `SIVA` |
 | `especialidade` | `ENUM('MECANICO','ELETRICISTA')` | nullable — obrigatória p/ `TECNICO`, proibida p/ demais |
 | `status` | `ENUM('ATIVO','INATIVO')` | `NOT NULL`, default `ATIVO` — `INATIVO` bloqueia login |
-| `empresa_id` | `INT` | FK → `empresa.id`, `NULL` **apenas** para `ADMIN` |
+| `empresa_id` | `INT` | FK → `empresa.id`, `NOT NULL` — `ADMIN` vinculado à SIVA |
 | `criado_em` | `DATETIME` | default `CURRENT_TIMESTAMP` |
 
 ### `setor`

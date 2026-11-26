@@ -41,9 +41,17 @@ Três papéis, definidos na coluna `usuario.tipo`, com status `ATIVO|INATIVO` (i
 
 | Papel | Escopo | O que só ele pode fazer |
 | --- | --- | --- |
-| `ADMIN` | todas as empresas (`empresaId = NULL`, sem especialidade) | CRUD de empresas; criar `ADMIN`/`GESTOR`/`TECNICO`; editar qualquer usuário; ativar/inativar; deletar usuário; dashboard admin |
-| `GESTOR` | só a própria empresa (`empresaId` obrigatório, sem especialidade) | CRUD de setores/ativos/ESP32s/sensores da empresa; leitura de usuários da própria empresa |
-| `TECNICO` | só a própria empresa + especialidade `MECANICO\|ELETRICISTA` obrigatória | ver dados, abrir/atualizar chamados de manutenção |
+| `ADMIN` | global; vinculado à SIVA (`empresaId = SIVA.id`, sem especialidade) | CRUD de empresas; criar/editar/ativar/inativar/deletar usuários; aceitar/concluir OS e designar técnicos; dashboard admin |
+| `GESTOR` | só a própria empresa cliente (`empresaId` obrigatório, sem especialidade) | CRUD de setores/ativos/ESP32s/sensores da empresa; manutenção interna; criar OS; leitura de usuários da própria empresa |
+| `TECNICO` | **exclusivo da SIVA** (`Empresa.tipo = SIVA`) + especialidade `MECANICO\|ELETRICISTA` obrigatória | listar e visualizar somente as OS em que é o `funcionarioId` |
+
+> Cadastro de usuários: empresa SIVA aceita `ADMIN` ou `TECNICO`; empresa cliente aceita somente `GESTOR`. Todo usuário pertence a uma empresa (inclusive o `ADMIN`). Combinações inválidas retornam `422`.
+
+O `TECNICO` é bloqueado nos demais módulos pelo middleware `denyTecnico`
+(users, companies, sectors, assets, devices, sensors, maintenances, alerts,
+dashboard e `GET /readings`). Nas OS, o escopo não é por `empresaId`: o service
+filtra `funcionarioId = usuário autenticado`, e o detalhe de OS de outro técnico
+retorna `403`.
 
 Aplicado em duas camadas, sempre nessa ordem:
 

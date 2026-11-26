@@ -1,6 +1,21 @@
 # Project State
 
-Data: 2026-10-21 (front-end público + área ADMIN do SIVA)
+Data: 2026-11-26 (técnico exclusivo da SIVA + cadastro de usuários por empresa)
+
+## Sessão 2026-11-26 — TECNICO exclusivo da SIVA (ver `memory/sessions/2026-11-26.md`)
+
+1. `Empresa.tipo` (`SIVA|CLIENTE`) + migration/seed garantindo a SIVA
+   (CNPJ reservado `00.000.000/0001-00`); `ADMIN` vinculado à SIVA.
+2. Técnicos legados de empresas clientes migrados para a SIVA (histórico preservado).
+3. Cadastro de usuários dinâmico: SIVA → `ADMIN|TECNICO` (técnico com
+   especialidade); cliente → somente `GESTOR`; backend valida e retorna 422 claro.
+4. `TECNICO` só lista/abre OS em que é `funcionarioId`; aceitar/concluir/alterar
+   funcionário é exclusivo do `ADMIN`; criação de OS é exclusiva do `GESTOR`.
+5. `denyTecnico` bloqueia o técnico em users/companies/sectors/assets/devices/
+   sensors/maintenances/alerts/dashboard/readings.
+6. Front-end: formulário de usuário dinâmico, badge/proteção da SIVA e área
+   `/tecnico` (única tela: minhas ordens de serviço) com redirecionamento no login.
+7. Validação: backend `typecheck` + 91 testes OK; frontend `build` + `lint` OK.
 
 ## Sessão 2026-10-21 — front-end do zero (ver `memory/sessions/2026-10-21.md`)
 
@@ -40,52 +55,67 @@ Data: 2026-10-21 (front-end público + área ADMIN do SIVA)
 7. Consolidação definitiva: MANUTENÇÃO INTERNA = funcionário + preventiva/inspeção; ATENDIMENTO = cliente + Chamado + operador + OS; sem `Manutencao.alvo`; cargo≠perfil.
 8. Executado `separação.md` (Engenharia de Contexto): criados `AI.md` + `spec/` (31) + `decisions/` (ADR-006–009) + `tasks/` (3) + `memory/` (4). Apagados `separação.md` e `opneai.md` após consolidação.
 
-## Implementado (código) — atualizado 2026-10-21
+## Implementado (código) — atualizado 2026-11-26
 
 ### Back-end
 - Auth dupla: JWT (usuários) + X-Token (ESP32). INATIVO bloqueado no login e `/me` (403).
-- Roles definitivos: `ADMIN` (global) / `GESTOR` (empresa) / `TECNICO` (empresa + `MECANICO|ELETRICISTA`).
+- Roles: `ADMIN` (global, vinculado à SIVA) / `GESTOR` (empresa cliente) /
+  `TECNICO` (exclusivo da SIVA + `MECANICO|ELETRICISTA`).
+- `Empresa.tipo` (`SIVA|CLIENTE`); empresas criadas pela API nascem `CLIENTE`;
+  SIVA protegida contra edição/exclusão.
+- Cadastro de usuários: SIVA → `ADMIN|TECNICO`; cliente → `GESTOR`; todo usuário
+  tem empresa; técnico exige especialidade.
+- Ordens de serviço: `GESTOR` cria; `ADMIN` aceita/conclui/altera técnico;
+  `TECNICO` lista e abre somente as próprias OS.
+- `denyTecnico` bloqueia o técnico nos demais módulos; manutenção interna
+  executada por `GESTOR` da empresa do sensor.
 - Status `ATIVO|INATIVO` + `PATCH /users/:id/status` (só ADMIN); escrita de users só ADMIN.
 - CRUDs: users, companies (+`/:id/details`, `/:id/users`), sectors, assets, devices, sensors;
-  readings imutável; maintenances com `funcionarioId` validado (ATIVO + mesma empresa).
+  readings imutável; maintenances com `funcionarioId` validado (ATIVO + GESTOR da empresa).
 - Dashboard admin com contadores reais; envelope `{success,data,meta+totalPages}`; erros
   Prisma mapeados (409/404); MOCK_MODE; Swagger `/docs` atualizado.
 
 ### Front-end (`siva-frontend/`)
 - Landing pública + login ligados à API real (sem mock, sem resposta simulada).
-- Área `/admin` (ADMIN): dashboard, empresas, usuários, sensores — com CRUD, filtros,
-  paginação, confirmações de exclusão e tratamento de 409/422 campo-a-campo.
+- Área `/admin` (ADMIN): dashboard, empresas, usuários, sensores e solicitações —
+  com CRUD, filtros, paginação, confirmações de exclusão e tratamento de 409/422.
+- Formulário de usuário dinâmico por empresa (SIVA × cliente), com especialidade
+  apenas para técnico da SIVA.
+- Área `/painel` (GESTOR): visão geral, setores, ativos, dispositivos, sensores,
+  solicitações e equipe.
+- Área `/tecnico` (TECNICO): única tela com as OS designadas ao usuário, filtro de
+  status e detalhe somente leitura; sem menu para outras rotas.
 - Camadas: `types/` (contratos espelhando o back-end) → `services/` (cliente HTTP + um
-  service por recurso) → `features/` (auth, landing, admin) → `pages/` → `components/ui/`.
-- Área admin em `React.lazy` (bundle público 302 kB / 95,7 kB gzip; `motion` isolado).
-- Estado de sessão em `localStorage` (`siva.auth.session`), revalidado no boot via `/auth/me`.
-- 429 do rate limit tratado com mensagem própria; erros 5xx nunca expõem detalhe do servidor.
+  service por recurso) → `features/` (auth, landing, admin, panel, tecnico) → `pages/`
+  → `components/ui/`.
+- Áreas carregadas em `React.lazy`; sessão em `localStorage` (`siva.auth.session`),
+  revalidada no boot via `/auth/me`; 429 tratado com mensagem própria.
 
-## Parcial (atualizado 2026-10-21)
+## Parcial (atualizado 2026-11-26)
 
-- `maintenances` agora valida `funcionarioId` (existe/ATIVO/mesma empresa), mas segue sem
-  `authorize` na rota e sem dono (`funcionarioId == me`) — PROB-001 parcialmente resolvido.
-- Isolamento só cliente×cliente; vendedora×clientes ausente (PROB-002/003).
+- `maintenances` tem `authorize` (ADMIN/GESTOR) e exige executor `GESTOR` da empresa
+  do sensor; não há mais técnico executando manutenção interna — PROB-001 resolvido.
+- Isolamento multiempresa por `empresaId`; o técnico da SIVA é escopado por
+  `funcionarioId` nas OS. Vendedora×clientes segue ausente (PROB-002/003).
 - JWT stateless sem revogação: token de usuário inativado vale até expirar (PROB-006 parcial).
-- Migration criada (`db/migrations/001_roles_status.sql`) mas sem Prisma Migrate unificado (PROB-007 parcial).
-- Front-end cobre só o perfil ADMIN. `GESTOR`/`TECNICO` autenticam e veem a página de
-  permissão insuficiente — o painel deles não existe (pendência de escopo, ver `memory/pending.md`).
+- Migrations Prisma + `db.sql` convivem; Prisma Migrate ainda não é fonte única (PROB-007 parcial).
+- Front-end cobre ADMIN (`/admin`), GESTOR (`/painel`) e TECNICO (`/tecnico`).
 - Identidade visual do front reconstruída da especificação textual: **as imagens de
   referência nunca chegaram ao ambiente** — falta conferência pixel a pixel.
 
 ## Planejado
 
-- `operador`, `cargo`, `Empresa.tipo` (+ vínculo operador×clientes) — TASK-001.
-- `Chamado`, `OrdemServico` (+ rotas, estados) — TASK-002/003.
-- Travas maintenances, hardening token/JWT/migration, P3 (agenda, checklist, alertas, dashboard).
-- Front-end: área para `GESTOR`/`TECNICO` (leituras, manutenção, chamados), refresh token,
-  tema claro/escuro, envio de e-mail transacional (recuperação de senha).
+- `operador`, `cargo` (+ vínculo operador×clientes) — TASK-001.
+- `Chamado` como entidade própria (a OS já existe implementada) — TASK-002/003.
+- Hardening token/JWT/migration, P3 (agenda, checklist, alertas, dashboard).
+- Front-end: refresh token, tema claro/escuro, envio de e-mail transacional
+  (recuperação de senha).
 
 ## Documentação de contexto (fonte de verdade)
 
 - Contrato: `AI.md` (agente) + `ai.md` (regras backend) + `siva-frontend/ai.md` (regras front).
 - Esperado: `spec/` (produto, requisitos, 10 domínios, 6 regras, 6 use-cases, 6 arquitetura).
-- Decisões: `docs/adr/0001-0005` (base) + `decisions/ADR-006–009` (negócio).
+- Decisões: `docs/adr/0001-0005` (base) + `decisions/ADR-006–010` (negócio).
 - Detalhe técnico: `docs/` + `docs/backend-architecture.md` + `docs/analise-regras-negocio.md`.
 - Front-end: `siva-frontend/README.md` (rotas, contrato de auth, endpoints consumidos, regras
   replicadas, credenciais de teste, observações de operação).
@@ -95,6 +125,6 @@ Data: 2026-10-21 (front-end público + área ADMIN do SIVA)
 ## Próximo passo
 
 - Back-end: decidir escopo do operador (todas vs atribuídas — ver `memory/pending.md`) e
-  implementar TASK-001.
-- Front-end: fechar a conferência visual com as imagens de referência e definir o escopo
-  da área de `GESTOR`/`TECNICO` antes de ampliar o painel.
+  implementar TASK-001; avaliar incluir o nome da empresa nas respostas de OS para a área
+  do técnico.
+- Front-end: fechar a conferência visual com as imagens de referência.

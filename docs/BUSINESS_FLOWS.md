@@ -115,16 +115,21 @@ flowchart LR
 
 ### Empresa
 - `nome` obrigatório (2–100 caracteres); `cnpj` opcional, mas único quando informado.
-- Só `super_admin` pode criar, editar ou remover empresas.
-- Usuários não-`super_admin` só enxergam a própria empresa em `GET /companies` (nunca a lista completa).
+- `tipo` (`SIVA|CLIENTE`): a SIVA é única (CNPJ reservado `00.000.000/0001-00`) e concentra
+  `ADMIN`/`TECNICO`; empresas criadas pela API nascem `CLIENTE`.
+- Só `ADMIN` pode criar, editar ou remover empresas; a SIVA não pode ser editada/excluída.
+- `GESTOR` só enxerga a própria empresa em `GET /companies`; `TECNICO` não acessa empresas.
 
 ### Usuário
 - `email` único no sistema inteiro (não só por empresa).
-- `senha` nunca é armazenada em claro (bcrypt, 10 salt rounds) nem retornada em nenhuma resposta da API.
-- `empresaId` é `NULL` **somente** para `tipo = super_admin`; para `admin_empresa`/`funcionario` é obrigatório.
-- Só `super_admin` pode criar outro `super_admin`.
-- `admin_empresa`/`super_admin` só conseguem criar usuário vinculado à **própria** empresa (ou qualquer uma, se `super_admin`) — `assertSameCompany` barra a tentativa de criar usuário em empresa alheia.
-- Endpoint de exclusão (`DELETE /users/:id`) é restrito a `super_admin`.
+- `senha` nunca é armazenada em claro (bcrypt, 12 salt rounds) nem retornada em nenhuma resposta da API.
+- `empresaId` é **obrigatório para todos os perfis**; o `ADMIN` é vinculado à SIVA.
+- Regras de combinação:
+  - empresa `SIVA` → `ADMIN` ou `TECNICO` (técnico exige especialidade);
+  - empresa `CLIENTE` → somente `GESTOR`.
+- Só `ADMIN` cria/edita/ativa/inativa/exclui usuários (`POST/PATCH/DELETE /users`).
+- `GESTOR` mantém apenas leitura dos usuários da própria empresa; `TECNICO` não acessa.
+- Endpoint de exclusão (`DELETE /users/:id`) é restrito a `ADMIN`.
 
 ### Setor
 - Pertence a exatamente uma empresa (`empresaId` obrigatório e imutável após criação — não faz parte do payload de update).
