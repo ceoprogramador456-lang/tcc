@@ -58,7 +58,10 @@ it('transmite mudanças sem segredos e respeita empresa e cargo do assinante', a
       login('diego.ramos@siva.com'),
     ]);
     const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(6000)]);
-    await api.get(base + '/events').set('Authorization', tecnico).expect(403);
+    await api
+      .get(base + '/events')
+      .set('Authorization', tecnico)
+      .expect(403);
     const [same, other] = await Promise.all([
       connect(url, gestor, signal),
       connect(url, outraEmpresa, signal),
