@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorize } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, authorize, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { userController } from '../controllers/user.controller.js';
 import {
@@ -12,7 +12,7 @@ import {
 
 export const userRoutes = Router();
 
-userRoutes.use(authenticateUser);
+userRoutes.use(authenticateUser, denyTecnico);
 
 userRoutes.get(
   '/',

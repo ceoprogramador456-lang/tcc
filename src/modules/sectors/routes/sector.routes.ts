@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorize } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, authorize, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { sectorController } from '../controllers/sector.controller.js';
 import {
@@ -11,7 +11,7 @@ import {
 
 export const sectorRoutes = Router();
 
-sectorRoutes.use(authenticateUser);
+sectorRoutes.use(authenticateUser, denyTecnico);
 
 sectorRoutes.get('/', validate({ query: listSectorsQuerySchema }), sectorController.list);
 sectorRoutes.get('/:id', validate({ params: sectorIdParamSchema }), sectorController.getById);

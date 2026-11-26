@@ -42,9 +42,11 @@ cp .env.example .env
 
 | Perfil | E-mail | Senha | Acesso |
 |---|---|---|---|
-| Administrador | `super@siva.com` | `senha123` | `/admin` + `/painel` |
-| Gestor | `carla.mendes@aquaplas.com` | `senha123` | `/painel` |
-| Técnico | `diego.ramos@aquaplas.com` | `senha123` | `/painel` (somente leitura) |
+| Administrador | `super@siva.com` | `senha123` | `/admin` |
+| Gestor (Aquaplás) | `carla.mendes@aquaplas.com` | `senha123` | `/painel` |
+| Gestor (Metaltec) | `beatriz.nogueira@metaltec.com` | `senha123` | `/painel` |
+| Técnico/Mecânico (SIVA) | `diego.ramos@siva.com` | `senha123` | `/tecnico` |
+| Técnico/Eletricista (SIVA) | `marcos.vinicius@siva.com` | `senha123` | `/tecnico` |
 
 ## Scripts
 
@@ -60,17 +62,21 @@ npm run preview   # serve o build de produção
 | Rota | Acesso | Descrição |
 |---|---|---|
 | `/` | público | Página inicial institucional |
-| `/login` | público | Autenticação |
-| `/admin` | ADMIN | Dashboard administrativo, Empresas, Usuários |
-| `/painel` | qualquer autenticado | Dashboard operacional (consumo, atividades) |
-| `/painel/setores` | qualquer autenticado | Setores da empresa + ativos do setor |
-| `/painel/ativos` | qualquer autenticado | Ativos, com vínculo por setor |
-| `/painel/esp32` | qualquer autenticado | Dispositivos, comunicação e fluxo do token |
-| `/painel/sensores` | qualquer autenticado | Sensores, ativação e estado de comunicação |
+| `/login` | público | Autenticação (redireciona por perfil) |
+| `/admin` | ADMIN | Dashboard administrativo, Empresas, Usuários e Solicitações |
+| `/painel` | GESTOR | Dashboard operacional (consumo, atividades) |
+| `/painel/setores` | GESTOR | Setores da empresa + ativos do setor |
+| `/painel/ativos` | GESTOR | Ativos, com vínculo por setor |
+| `/painel/esp32` | GESTOR | Dispositivos, comunicação e fluxo do token |
+| `/painel/sensores` | GESTOR | Sensores, ativação e estado de comunicação |
+| `/painel/solicitacoes` | GESTOR | Ordens de serviço da empresa |
+| `/painel/usuarios` | GESTOR | Equipe da própria empresa |
+| `/tecnico` | TECNICO | Única tela: ordens de serviço designadas ao técnico |
 
-O guard de rota (`<RequireAdmin>` / `<RequireAuthenticated>`) é apenas UX: **a autorização
-real é sempre validada no back-end** (RBAC por `tipo` + isolamento multiempresa). O front
-esconde as ações que o servidor recusaria (ex.: `TECNICO` não vê botões de escrita).
+O guard de rota (`<RequireAdmin>` / `<RequireAuthenticated>` / `<RequireTecnico>`) é apenas
+UX: **a autorização real é sempre validada no back-end** (RBAC por `tipo` + isolamento
+multiempresa + escopo por `funcionarioId` nas OS). O front esconde as ações que o servidor
+recusaria — o `TECNICO`, por exemplo, só enxerga `/tecnico`.
 
 ## Contrato de autenticação
 
@@ -98,11 +104,14 @@ JWT em `localStorage` (chave `siva.auth.session`) e o descarta no logout.
 | ESP32 | `GET /api/devices?empresaId=&setorId=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
 | Sensores | `GET /api/sensors?empresaId=&ativoId=&esp32Id=&ativoStatus=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
 | Empresas / Usuários | `GET/POST/PATCH/DELETE /api/companies`, `/api/users`, `PATCH /api/users/:id/status` | ver `docs/API.md` |
+| Ordens de serviço | `GET/POST /api/solicitacoes-servico`, `GET/PATCH /:id`, `POST /:id/aceitar`, `POST /:id/concluir` | GESTOR cria; ADMIN aceita/conclui; TECNICO vê só as suas |
 
 Regras de negócio replicadas no front (o back-end continua sendo a fonte da verdade):
-- `ADMIN` → sem empresa e sem especialidade;
-- `GESTOR` → empresa obrigatória, sem especialidade;
-- `TECNICO` → empresa e especialidade obrigatórias;
+- todo usuário pertence a uma empresa (inclusive o `ADMIN`, vinculado à SIVA);
+- empresa SIVA → `ADMIN` ou `TECNICO`; técnico exige especialidade;
+- empresa cliente → somente `GESTOR`;
+- o formulário de usuário é dinâmico: ao trocar a empresa, os perfis permitidos e o
+  campo de especialidade se atualizam;
 - e-mail duplicado → `409`; recursos com vínculos → `409` (usar inativação quando existir).
 
 ## Token do ESP32

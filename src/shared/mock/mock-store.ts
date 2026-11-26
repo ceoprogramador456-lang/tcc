@@ -9,6 +9,7 @@ import type { Device } from '../../modules/devices/entities/device.entity.js';
 import type { Sensor } from '../../modules/sensors/entities/sensor.entity.js';
 import type { Reading } from '../../modules/readings/entities/reading.entity.js';
 import type { Maintenance } from '../../modules/maintenances/entities/maintenance.entity.js';
+import type { OrdemServico } from '../../modules/ordemServico/entities/ordemServico.entity.js';
 
 const now = new Date();
 const hoursAgo = (hours: number): Date => new Date(now.getTime() - hours * 60 * 60 * 1000);
@@ -22,30 +23,40 @@ export const devices = new MockCollection<Device>();
 export const sensors = new MockCollection<Sensor>();
 export const readings = new MockCollection<Reading>();
 export const maintenances = new MockCollection<Maintenance>();
+export const ordensServico = new MockCollection<OrdemServico>();
 
 function seed(): void {
   const aquaplas = companies.create({
     nome: 'Aquaplás Indústria Ltda',
     cnpj: '12.345.678/0001-90',
+    tipo: 'CLIENTE',
     criadoEm: hoursAgo(720),
   });
   const metaltec = companies.create({
     nome: 'Metaltec Componentes S.A.',
     cnpj: '98.765.432/0001-10',
+    tipo: 'CLIENTE',
     criadoEm: hoursAgo(480),
   });
+  // Empresa dona do sistema: concentra ADMIN e TECNICO.
+  const siva = companies.create({
+    nome: 'SIVA',
+    cnpj: '00.000.000/0001-00',
+    tipo: 'SIVA',
+    criadoEm: hoursAgo(720),
+  });
 
-  users.create({
+  const admin = users.create({
     nome: 'Administrador SIVA',
     email: 'super@siva.com',
     senha: passwordHash,
     tipo: 'ADMIN',
     especialidade: null,
     status: 'ATIVO',
-    empresaId: null,
+    empresaId: siva.id,
     criadoEm: hoursAgo(720),
   });
-  users.create({
+  const carla = users.create({
     nome: 'Carla Mendes',
     email: 'carla.mendes@aquaplas.com',
     senha: passwordHash,
@@ -55,14 +66,14 @@ function seed(): void {
     empresaId: aquaplas.id,
     criadoEm: hoursAgo(700),
   });
-  users.create({
+  const diego = users.create({
     nome: 'Diego Ramos',
-    email: 'diego.ramos@aquaplas.com',
+    email: 'diego.ramos@siva.com',
     senha: passwordHash,
     tipo: 'TECNICO',
     especialidade: 'MECANICO',
     status: 'ATIVO',
-    empresaId: aquaplas.id,
+    empresaId: siva.id,
     criadoEm: hoursAgo(650),
   });
   users.create({
@@ -74,6 +85,16 @@ function seed(): void {
     status: 'ATIVO',
     empresaId: metaltec.id,
     criadoEm: hoursAgo(470),
+  });
+  const marcos = users.create({
+    nome: 'Marcos Vinícius',
+    email: 'marcos.vinicius@siva.com',
+    senha: passwordHash,
+    tipo: 'TECNICO',
+    especialidade: 'ELETRICISTA',
+    status: 'ATIVO',
+    empresaId: siva.id,
+    criadoEm: hoursAgo(460),
   });
 
   const producao = sectors.create({
@@ -201,7 +222,7 @@ function seed(): void {
     tipo: 'preventiva',
     status: 'concluido',
     descricao: 'Calibração trimestral do sensor de vazão.',
-    funcionarioId: 3,
+    funcionarioId: carla.id,
     abertoEm: hoursAgo(200),
     concluidoEm: hoursAgo(198),
   });
@@ -213,6 +234,68 @@ function seed(): void {
     funcionarioId: null,
     abertoEm: hoursAgo(2),
     concluidoEm: null,
+  });
+
+  ordensServico.create({
+    nome: 'Substituição do tanque de ETA 01',
+    tipo: 'preventiva',
+    descricao: 'Troca de gaskets e inspeção visual do tanque de armazenamento.',
+    status: 'aberto',
+    empresaId: aquaplas.id,
+    solicitanteId: carla.id,
+    funcionarioId: null,
+    aceitoPor: null,
+    aceitoEm: null,
+    concluidoEm: null,
+    criadoEm: hoursAgo(40),
+    atualizadoEm: hoursAgo(40),
+  });
+
+  ordensServico.create({
+    nome: 'Inspeção do túnel CIP',
+    tipo: 'inspecao',
+    descricao: 'Verificar vazamentos nas juntas do túnel de limpeza.',
+    status: 'em_andamento',
+    empresaId: aquaplas.id,
+    solicitanteId: carla.id,
+    funcionarioId: diego.id,
+    aceitoPor: admin.id,
+    aceitoEm: hoursAgo(12),
+    concluidoEm: null,
+    criadoEm: hoursAgo(18),
+    atualizadoEm: hoursAgo(10),
+  });
+
+  ordensServico.create({
+    nome: 'Calibração da bomba de resfriamento',
+    tipo: 'corretiva',
+    descricao: null,
+    status: 'concluido',
+    empresaId: aquaplas.id,
+    solicitanteId: carla.id,
+    funcionarioId: diego.id,
+    aceitoPor: admin.id,
+    aceitoEm: hoursAgo(140),
+    concluidoEm: hoursAgo(130),
+    criadoEm: hoursAgo(150),
+    atualizadoEm: hoursAgo(130),
+  });
+
+  // Segunda OS da mesma empresa, designada a outro técnico da SIVA: usada
+  // para comprovar que um técnico não enxerga a ordem do outro.
+  ordensServico.create({
+    nome: 'Revisão elétrica do painel de produção',
+    tipo: 'corretiva',
+    descricao: 'Verificar o quadro elétrico e os contatores da linha de produção.',
+    status: 'em_andamento',
+    empresaId: aquaplas.id,
+    solicitanteId: carla.id,
+    funcionarioId: marcos.id,
+    aceitoPor: admin.id,
+    aceitoEm: hoursAgo(6),
+    concluidoEm: null,
+    criadoEm: hoursAgo(8),
+    atualizadoEm: hoursAgo(5),
   });
 }
 

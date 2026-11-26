@@ -15,24 +15,37 @@ if (!email || !senha) {
   process.exit(1);
 }
 
-async function main(): Promise<void> {
+async function main(email: string, senha: string): Promise<void> {
+  // ADMIN pertence à SIVA (empresa dona do sistema). Cria a empresa caso o
+  // banco ainda não tenha sido migrado/seedado.
+  const siva = await prisma.empresa.upsert({
+    where: { cnpj: '00.000.000/0001-00' },
+    update: { nome: 'SIVA', tipo: 'SIVA' },
+    create: { nome: 'SIVA', cnpj: '00.000.000/0001-00', tipo: 'SIVA' },
+  });
+
   const user = await prisma.usuario.upsert({
     where: { email },
-    update: { senha: bcrypt.hashSync(senha, 12) },
+    update: {
+      senha: bcrypt.hashSync(senha, 12),
+      tipo: 'ADMIN',
+      especialidade: null,
+      empresaId: siva.id,
+    },
     create: {
-      nome: 'Administrador ETEC',
+      nome: 'Administrador SIVA',
       email,
       senha: bcrypt.hashSync(senha, 12),
       tipo: 'ADMIN',
       especialidade: null,
       status: 'ATIVO',
-      empresaId: null,
+      empresaId: siva.id,
     },
   });
   console.log(`OK: id=${user.id} email=${user.email} tipo=${user.tipo} status=${user.status}`);
 }
 
-main()
+main(email, senha)
   .catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;

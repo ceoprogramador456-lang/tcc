@@ -15,53 +15,31 @@ export const createUserSchema = z
     status: statusUsuarioSchema.optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.tipo === 'ADMIN') {
-      if (data.empresaId !== undefined && data.empresaId !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['empresaId'],
-          message: 'ADMIN não deve possuir empresaId.',
-        });
-      }
-      if (data.especialidade !== undefined && data.especialidade !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['especialidade'],
-          message: 'ADMIN não deve possuir especialidade.',
-        });
-      }
+    // Todo usuário pertence a uma empresa: ADMIN/TECNICO à SIVA e GESTOR a
+    // uma empresa cliente. O tipo da empresa é validado no service (depende do
+    // banco); aqui garantimos apenas a presença e a especialidade.
+    if (data.empresaId === undefined || data.empresaId === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['empresaId'],
+        message: 'empresaId é obrigatório.',
+      });
     }
-    if (data.tipo === 'GESTOR') {
-      if (data.empresaId === undefined || data.empresaId === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['empresaId'],
-          message: 'empresaId é obrigatório para GESTOR.',
-        });
-      }
-      if (data.especialidade !== undefined && data.especialidade !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['especialidade'],
-          message: 'GESTOR não deve possuir especialidade.',
-        });
-      }
-    }
+
     if (data.tipo === 'TECNICO') {
-      if (data.empresaId === undefined || data.empresaId === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['empresaId'],
-          message: 'empresaId é obrigatório para TECNICO.',
-        });
-      }
       if (data.especialidade === undefined || data.especialidade === null) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['especialidade'],
-          message: 'especialidade é obrigatória para TECNICO (MECANICO ou ELETRICISTA).',
+          message: 'TECNICO deve possuir especialidade (MECANICO ou ELETRICISTA).',
         });
       }
+    } else if (data.especialidade !== undefined && data.especialidade !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['especialidade'],
+        message: `${data.tipo} não deve possuir especialidade.`,
+      });
     }
   });
 
@@ -75,29 +53,33 @@ export const updateUserSchema = z
     especialidade: especialidadeSchema.optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    // Valida a combinação apenas quando tipo + correlatos são enviados juntos.
-    // A validação completa da combinação final acontece no service.
-    if (data.tipo === 'ADMIN') {
-      if (data.empresaId !== undefined && data.empresaId !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['empresaId'],
-          message: 'ADMIN não deve possuir empresaId.',
-        });
-      }
-      if (data.especialidade !== undefined && data.especialidade !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['especialidade'],
-          message: 'ADMIN não deve possuir especialidade.',
-        });
-      }
+    // Valida apenas o que foi enviado; a combinação final (tipo + empresa +
+    // especialidade) é conferida no service, que conhece o tipo da empresa.
+    if (data.empresaId === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['empresaId'],
+        message: 'empresaId é obrigatório.',
+      });
     }
-    if (data.tipo === 'GESTOR' && data.especialidade !== undefined && data.especialidade !== null) {
+
+    if (data.tipo === 'TECNICO' && data.especialidade === null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['especialidade'],
-        message: 'GESTOR não deve possuir especialidade.',
+        message: 'TECNICO deve possuir especialidade (MECANICO ou ELETRICISTA).',
+      });
+    }
+    if (
+      data.tipo !== undefined &&
+      data.tipo !== 'TECNICO' &&
+      data.especialidade !== undefined &&
+      data.especialidade !== null
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['especialidade'],
+        message: `${data.tipo} não deve possuir especialidade.`,
       });
     }
   });

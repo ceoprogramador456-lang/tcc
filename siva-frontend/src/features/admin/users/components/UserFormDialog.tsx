@@ -6,10 +6,16 @@ import { InputField, SelectField } from '../../../../components/ui/FormField';
 import { Modal } from '../../../../components/ui/Modal';
 import type { Company } from '../../../../types/company';
 import type { PublicUser } from '../../../../types/user';
+import { USER_TYPE_LABELS } from '../../../auth/user-labels';
 import { extractApiFieldErrors } from '../../forms/extract-api-field-errors';
-import { EMPTY_USER_FORM } from '../user-form-rules';
+import {
+  EMPTY_USER_FORM,
+  allowedUserTypes,
+  companyTipoById,
+  fallbackUserType,
+  validateUserForm,
+} from '../user-form-rules';
 import type { UserFormValues } from '../user-form-rules';
-import { validateUserForm } from '../user-form-rules';
 
 interface UserFormDialogProps {
   open: boolean;
@@ -72,16 +78,43 @@ function UserFormDialogBody({ open, user, companies, onClose, onSubmit }: UserFo
     setValues((current) => ({
       ...current,
       tipo,
-      // A empresa e a especialidade não se aplicam a perfis que não as exigem.
-      empresaId: tipo === 'ADMIN' ? '' : current.empresaId,
+      // A especialidade só se aplica ao técnico.
       especialidade: tipo === 'TECNICO' ? current.especialidade : '',
     }));
+  };
+
+  const handleEmpresaChange = (empresaId: string): void => {
+    setValues((current) => {
+      const tipoEmpresa = companyTipoById(companies, empresaId);
+      const allowed = allowedUserTypes(tipoEmpresa);
+      // Ao trocar a empresa, o perfil atual pode deixar de ser válido
+      // (ex.: GESTOR ao escolher a SIVA). Assume o perfil padrão da empresa.
+      const tipo = allowed.includes(current.tipo)
+        ? current.tipo
+        : fallbackUserType(tipoEmpresa);
+
+      return {
+        ...current,
+        empresaId,
+        tipo,
+        especialidade: tipo === 'TECNICO' ? current.especialidade : '',
+      };
+    });
+
+    // Erros de empresa/perfil/especialidade ficam obsoletos após a troca.
+    setErrors((current) => {
+      const next = { ...current };
+      delete next.empresaId;
+      delete next.tipo;
+      delete next.especialidade;
+      return next;
+    });
   };
 
   const handleSubmit = async (): Promise<void> => {
     if (isSaving) return;
 
-    const nextErrors = validateUserForm(values, { isEditing });
+    const nextErrors = validateUserForm(values, { isEditing, companies });
     setErrors(nextErrors);
     setFormError(null);
     if (Object.keys(nextErrors).length > 0) return;
@@ -105,6 +138,18 @@ function UserFormDialogBody({ open, user, companies, onClose, onSubmit }: UserFo
     value: String(company.id),
     label: company.nome,
   }));
+
+  const tipoEmpresa = companyTipoById(companies, values.empresaId);
+  const profileOptions = allowedUserTypes(tipoEmpresa).map((tipo) => ({
+    value: tipo,
+    label: USER_TYPE_LABELS[tipo],
+  }));
+  const companyHint =
+    tipoEmpresa === 'SIVA'
+      ? 'A SIVA aceita os perfis Administrador e Técnico.'
+      : tipoEmpresa === 'CLIENTE'
+        ? 'Empresas clientes aceitam somente o perfil Gestor.'
+        : 'Selecione a empresa para ver os perfis disponíveis.';
 
   return (
     <Modal
@@ -179,6 +224,19 @@ function UserFormDialogBody({ open, user, companies, onClose, onSubmit }: UserFo
           disabled={isSaving}
         />
 
+        <SelectField
+          name="empresaId"
+          label="Empresa"
+          required
+          value={values.empresaId}
+          onChange={handleEmpresaChange}
+          error={errors.empresaId}
+          hint={companyHint}
+          placeholder="Selecione a empresa"
+          disabled={isSaving}
+          options={companyOptions}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
             name="tipo"
@@ -186,12 +244,9 @@ function UserFormDialogBody({ open, user, companies, onClose, onSubmit }: UserFo
             required
             value={values.tipo}
             onChange={(value) => handleTipoChange(value as UserFormValues['tipo'])}
-            disabled={isSaving}
-            options={[
-              { value: 'ADMIN', label: 'Administrador' },
-              { value: 'GESTOR', label: 'Gestor' },
-              { value: 'TECNICO', label: 'Técnico' },
-            ]}
+            error={errors.tipo}
+            disabled={isSaving || values.empresaId === ''}
+            options={profileOptions}
           />
 
           {!isEditing ? (
@@ -209,24 +264,6 @@ function UserFormDialogBody({ open, user, companies, onClose, onSubmit }: UserFo
             />
           ) : null}
         </div>
-
-        {values.tipo === 'ADMIN' ? (
-          <AlertMessage tone="info">
-            Administradores têm acesso global e não são vinculados a nenhuma empresa.
-          </AlertMessage>
-        ) : (
-          <SelectField
-            name="empresaId"
-            label="Empresa"
-            required
-            value={values.empresaId}
-            onChange={(value) => update('empresaId', value)}
-            error={errors.empresaId}
-            placeholder="Selecione a empresa"
-            disabled={isSaving}
-            options={companyOptions}
-          />
-        )}
 
         {values.tipo === 'TECNICO' ? (
           <SelectField

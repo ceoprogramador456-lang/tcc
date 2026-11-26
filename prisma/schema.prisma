@@ -33,6 +33,18 @@ enum StatusUsuario {
   @@map("status_usuario")
 }
 
+/**
+ * Natureza da empresa.
+ * - SIVA: empresa dona do sistema. Concentra ADMIN e TECNICO.
+ * - CLIENTE: empresa que adquire o sistema. Concentra GESTOR.
+ */
+enum TipoEmpresa {
+  SIVA
+  CLIENTE
+
+  @@map("tipo_empresa")
+}
+
 enum Criticidade {
   baixa
   media
@@ -52,13 +64,15 @@ enum StatusManutencao {
 }
 
 model Empresa {
-  id        Int      @id @default(autoincrement())
-  nome      String   @db.VarChar(100)
-  cnpj      String?  @unique @db.VarChar(20)
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  id       Int         @id @default(autoincrement())
+  nome     String      @db.VarChar(100)
+  cnpj     String?     @unique @db.VarChar(20)
+  tipo     TipoEmpresa @default(CLIENTE)
+  criadoEm DateTime    @default(now()) @map("criado_em")
 
-  usuarios Usuario[]
-  setores  Setor[]
+  usuarios      Usuario[]
+  setores       Setor[]
+  ordemServicos OrdemServico[]
 
   @@map("empresa")
 }
@@ -74,8 +88,14 @@ model Usuario {
   empresaId     Int?           @map("empresa_id")
   criadoEm      DateTime       @default(now()) @map("criado_em")
 
-  empresa      Empresa?      @relation(fields: [empresaId], references: [id])
-  manutencoes  Manutencao[]
+  empresa                  Empresa?       @relation(fields: [empresaId], references: [id])
+  manutencoes              Manutencao[]
+  /// Solicitações onde o usuário é o solicitante (GESTOR que criou).
+  ordensServicoSolicitadas OrdemServico[] @relation("OrdemServicoSolicitante")
+  /// Solicitações onde o usuário é o funcionário designado (TECNICO).
+  ordensServicoFuncionadas OrdemServico[] @relation("OrdemServicoFuncionario")
+  /// Solicitações onde o usuário aceitou/encerrou (ADMIN).
+  ordensServicoAceitas     OrdemServico[] @relation("OrdemServicoAceito")
 
   @@map("usuario")
 }
@@ -94,34 +114,34 @@ model Setor {
 }
 
 model Ativo {
-  id           Int         @id @default(autoincrement())
-  setorId      Int         @map("setor_id")
-  nome         String      @db.VarChar(100)
-  tag          String?     @unique @db.VarChar(50)
-  tipo         String?     @db.VarChar(50)
-  criticidade  Criticidade @default(media)
-  centroCusto  String?     @map("centro_custo") @db.VarChar(50)
-  fotoUrl      String?     @map("foto_url") @db.VarChar(255)
-  manualUrl    String?     @map("manual_url") @db.VarChar(255)
-  descricao    String?     @db.VarChar(255)
-  criadoEm     DateTime    @default(now()) @map("criado_em")
+  id          Int         @id @default(autoincrement())
+  setorId     Int         @map("setor_id")
+  nome        String      @db.VarChar(100)
+  tag         String?     @unique @db.VarChar(50)
+  tipo        String?     @db.VarChar(50)
+  criticidade Criticidade @default(media)
+  centroCusto String?     @map("centro_custo") @db.VarChar(50)
+  fotoUrl     String?     @map("foto_url") @db.VarChar(255)
+  manualUrl   String?     @map("manual_url") @db.VarChar(255)
+  descricao   String?     @db.VarChar(255)
+  criadoEm    DateTime    @default(now()) @map("criado_em")
 
-  setor   Setor    @relation(fields: [setorId], references: [id])
+  setor    Setor    @relation(fields: [setorId], references: [id])
   sensores Sensor[]
 
   @@map("ativo")
 }
 
 model Esp32 {
-  id             Int       @id @default(autoincrement())
-  setorId        Int       @map("setor_id")
-  espId          String    @unique @map("esp_id") @db.VarChar(50)
-  tokenHash      String    @unique @map("token_hash") @db.Char(64)
-  descricao      String?   @db.VarChar(100)
-  ultimoContato  DateTime? @map("ultimo_contato")
-  criadoEm       DateTime  @default(now()) @map("criado_em")
+  id            Int       @id @default(autoincrement())
+  setorId       Int       @map("setor_id")
+  espId         String    @unique @map("esp_id") @db.VarChar(50)
+  tokenHash     String    @unique @map("token_hash") @db.Char(64)
+  descricao     String?   @db.VarChar(100)
+  ultimoContato DateTime? @map("ultimo_contato")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
 
-  setor   Setor    @relation(fields: [setorId], references: [id])
+  setor    Setor    @relation(fields: [setorId], references: [id])
   sensores Sensor[]
 
   @@map("esp32")
@@ -137,20 +157,20 @@ model Sensor {
   ativoStatus Boolean  @default(true) @map("ativo_status")
   criadoEm    DateTime @default(now()) @map("criado_em")
 
-  ativo        Ativo        @relation(fields: [ativoId], references: [id])
-  esp32        Esp32        @relation(fields: [esp32Id], references: [id])
-  leituras     Leitura[]
-  manutencoes  Manutencao[]
+  ativo       Ativo        @relation(fields: [ativoId], references: [id])
+  esp32       Esp32        @relation(fields: [esp32Id], references: [id])
+  leituras    Leitura[]
+  manutencoes Manutencao[]
 
   @@unique([esp32Id, sensorId])
   @@map("sensor")
 }
 
 model Leitura {
-  id            BigInt   @id @default(autoincrement())
-  sensorId      Int      @map("sensor_id")
-  vazao         Float
-  registradoEm  DateTime @default(now()) @map("registrado_em")
+  id           BigInt   @id @default(autoincrement())
+  sensorId     Int      @map("sensor_id")
+  vazao        Float
+  registradoEm DateTime @default(now()) @map("registrado_em")
 
   sensor Sensor @relation(fields: [sensorId], references: [id])
 
@@ -159,18 +179,51 @@ model Leitura {
 }
 
 model Manutencao {
-  id            Int               @id @default(autoincrement())
-  sensorId      Int               @map("sensor_id")
+  id            Int              @id @default(autoincrement())
+  sensorId      Int              @map("sensor_id")
   tipo          TipoManutencao
-  status        StatusManutencao  @default(aberto)
-  descricao     String?           @db.Text
-  funcionarioId Int?              @map("funcionario_id")
-  abertoEm      DateTime          @default(now()) @map("aberto_em")
-  concluidoEm   DateTime?         @map("concluido_em")
+  status        StatusManutencao @default(aberto)
+  descricao     String?          @db.Text
+  funcionarioId Int?             @map("funcionario_id")
+  abertoEm      DateTime         @default(now()) @map("aberto_em")
+  concluidoEm   DateTime?        @map("concluido_em")
 
   sensor      Sensor   @relation(fields: [sensorId], references: [id])
   funcionario Usuario? @relation(fields: [funcionarioId], references: [id])
 
   @@index([status], name: "idx_manutencao_status")
   @@map("manutencao")
+}
+
+/**
+ * Solicitação de serviço (ordem de serviço).
+ * Reaproveita os enums `TipoManutencao` / `StatusManutencao`, que coincidem
+ * com os valores do contrato do fluxo de solicitação.
+ */
+model OrdemServico {
+  id            Int              @id @default(autoincrement())
+  nome          String           @db.VarChar(100)
+  tipo          TipoManutencao
+  descricao     String?          @db.Text
+  status        StatusManutencao @default(aberto)
+  empresaId     Int              @map("empresa_id")
+  solicitanteId Int              @map("solicitante_id")
+  funcionarioId Int?             @map("funcionario_id")
+  aceitoPor     Int?             @map("aceito_por")
+  aceitoEm      DateTime?        @map("aceito_em")
+  concluidoEm   DateTime?        @map("concluido_em")
+  criadoEm      DateTime         @default(now()) @map("criado_em")
+  atualizadoEm  DateTime         @updatedAt @map("atualizado_em")
+
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  /// Gestor que criou a solicitação.
+  solicitante Usuario  @relation("OrdemServicoSolicitante", fields: [solicitanteId], references: [id])
+  /// Funcionário executor — atribuído na transição para "em_andamento".
+  funcionario Usuario? @relation("OrdemServicoFuncionario", fields: [funcionarioId], references: [id])
+  /// Administrador que aceitou a solicitação.
+  aceitoPorU  Usuario? @relation("OrdemServicoAceito", fields: [aceitoPor], references: [id])
+
+  @@index([status], name: "idx_ordem_servico_status")
+  @@index([empresaId], name: "idx_ordem_servico_empresa")
+  @@map("ordem_servico")
 }

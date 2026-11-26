@@ -5,12 +5,13 @@ import { InputField } from '../../../../components/ui/FormField';
 import { Modal } from '../../../../components/ui/Modal';
 import { AlertMessage } from '../../../../components/ui/AlertMessage';
 import type { CreateSectorPayload, Sector, UpdateSectorPayload } from '../../../../types/sector';
+import { CompanyCombobox } from './CompanyCombobox';
 
 interface SectorFormDialogProps {
   open: boolean;
   /** `null` para criação; um setor para edição. */
   sector: Sector | null;
-  /** Empresa à qual o novo setor será vinculado. */
+  /** Empresa inicial do campo: do filtro do painel ao criar, do setor ao editar. */
   empresaId: number | null;
   onClose: () => void;
   onSubmit: (payload: CreateSectorPayload | UpdateSectorPayload) => Promise<void>;
@@ -18,6 +19,7 @@ interface SectorFormDialogProps {
 
 const FIELD_MESSAGES: Record<string, string> = {
   nome: 'Informe o nome do setor (2 a 100 caracteres).',
+  empresa: 'Selecione uma empresa.',
 };
 
 export function SectorFormDialog({
@@ -49,37 +51,40 @@ function SectorFormDialogBody({
   const isEditing = sector !== null;
 
   const [nome, setNome] = useState(sector?.nome ?? '');
+  const [empresa, setEmpresa] = useState(empresaId ? String(empresaId) : '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const selectedEmpresaId = (() => {
+    const parsed = Number(empresa);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  })();
 
   const handleSubmit = async (): Promise<void> => {
     if (isSaving) return;
 
     const trimmed = nome.trim();
-    if (trimmed.length < 2) {
-      setErrors({ nome: FIELD_MESSAGES.nome });
-      return;
+    const nextErrors: Record<string, string> = {};
+    if (trimmed.length < 2) nextErrors.nome = FIELD_MESSAGES.nome;
+
+    let payload: CreateSectorPayload | UpdateSectorPayload | null = null;
+    if (isEditing) {
+      payload = { nome: trimmed };
+    } else if (selectedEmpresaId !== null) {
+      payload = { nome: trimmed, empresaId: selectedEmpresaId };
+    } else {
+      nextErrors.empresa = FIELD_MESSAGES.empresa;
     }
 
-    if (!isEditing && (!empresaId || empresaId <= 0)) {
-      setFormError('Selecione uma empresa no filtro do painel antes de cadastrar o setor.');
-      return;
-    }
-
-    setErrors({});
+    setErrors(nextErrors);
     setFormError(null);
+    if (payload === null || Object.keys(nextErrors).length > 0) return;
+
     setIsSaving(true);
 
     try {
-      if (isEditing) {
-        await onSubmit({ nome: trimmed });
-      } else {
-        if (!empresaId || empresaId <= 0) {
-          throw new Error('Selecione uma empresa no filtro do painel antes de cadastrar o setor.');
-        }
-        await onSubmit({ nome: trimmed, empresaId });
-      }
+      await onSubmit(payload);
     } catch (error: unknown) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o setor.');
     } finally {
@@ -111,6 +116,15 @@ function SectorFormDialogBody({
     >
       <div className="space-y-4">
         {formError ? <AlertMessage tone="danger">{formError}</AlertMessage> : null}
+
+        <CompanyCombobox
+          label="Empresa"
+          value={empresa}
+          onChange={setEmpresa}
+          error={errors.empresa}
+          disabled={isSaving}
+          placeholder="Selecione a empresa"
+        />
 
         <InputField
           name="nome"

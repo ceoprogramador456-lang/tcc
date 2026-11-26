@@ -7,6 +7,8 @@ import { AdminLayout } from './features/admin/layout/AdminLayout';
 import { RequireAuthenticated } from './features/panel/guards/RequireAuthenticated';
 import { PanelLayout } from './features/panel/layout/PanelLayout';
 import { RequireCompanyManager } from './features/panel/guards/RequireCompanyManager';
+import { RequireTecnico } from './features/tecnico/guards/RequireTecnico';
+import { TecnicoLayout } from './features/tecnico/layout/TecnicoLayout';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -31,6 +33,17 @@ const UsersPage = lazy(() =>
 );
 const CompanyUsersPage = lazy(() => import('./features/panel/users/CompanyUsersPage'));
 
+const AdminSolicitacoesPage = lazy(() =>
+  import('./features/admin/ordem-servico/SolicitacoesServicoPage').then((m) => ({
+    default: m.default,
+  })),
+);
+const PanelSolicitacoesPage = lazy(() =>
+  import('./features/panel/ordem-servico/SolicitacoesServicoPage').then((m) => ({
+    default: m.default,
+  })),
+);
+
 const PanelDashboardPage = lazy(() =>
   import('./features/panel/dashboard/PanelDashboardPage').then((m) => ({ default: m.default })),
 );
@@ -46,6 +59,8 @@ const DevicesPage = lazy(() =>
 const PanelSensorsPage = lazy(() =>
   import('./features/panel/sensors/SensorsPage').then((m) => ({ default: m.default })),
 );
+
+const MinhasOrdensPage = lazy(() => import('./features/tecnico/MinhasOrdensPage'));
 
 function Fallback() {
   return (
@@ -99,6 +114,14 @@ export default function App() {
           element={
             <Suspense fallback={<Fallback />}>
               <UsersPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="solicitacoes"
+          element={
+            <Suspense fallback={<Fallback />}>
+              <AdminSolicitacoesPage />
             </Suspense>
           }
         />
@@ -160,6 +183,33 @@ export default function App() {
           element={
             <Suspense fallback={<Fallback />}>
               <PanelSensorsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="solicitacoes"
+          element={
+            <Suspense fallback={<Fallback />}>
+              <PanelSolicitacoesPage />
+            </Suspense>
+          }
+        />
+      </Route>
+
+      {/* Área do técnico da SIVA — única tela: suas ordens de serviço. */}
+      <Route
+        path="/tecnico"
+        element={
+          <RequireTecnico>
+            <TecnicoLayout />
+          </RequireTecnico>
+        }
+      >
+        <Route
+          index
+          element={
+            <Suspense fallback={<Fallback />}>
+              <MinhasOrdensPage />
             </Suspense>
           }
         />

@@ -15,7 +15,7 @@ interface RequireAuthenticatedProps {
  * telas para quem não está autenticado.
  */
 export function RequireAuthenticated({ children }: RequireAuthenticatedProps) {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
 
   if (status === 'loading') {
     return (
@@ -27,6 +27,16 @@ export function RequireAuthenticated({ children }: RequireAuthenticatedProps) {
 
   if (status === 'anonymous') {
     return <Navigate to="/login" replace />;
+  }
+
+  // O TECNICO possui área própria (somente suas ordens de serviço).
+  if (user?.tipo === 'TECNICO') {
+    return <Navigate to="/tecnico" replace />;
+  }
+
+  // O ADMIN não acessa as telas operacionais de "Visão geral" e "Equipamentos".
+  if (user?.tipo === 'ADMIN') {
+    return <Navigate to="/admin/solicitacoes" replace />;
   }
 
   return <>{children}</>;

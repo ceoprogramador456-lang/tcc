@@ -105,8 +105,9 @@ npm run dev:mock
 ```
 
 A API sobe em `http://localhost:3000` com hot-reload. Usuários de teste (senha `senha123`
-para todos): `super@siva.com` (super_admin), `carla.mendes@aquaplas.com`
-(admin_empresa), `diego.ramos@aquaplas.com` (funcionario).
+para todos): `super@siva.com` (ADMIN, vinculado à SIVA), `carla.mendes@aquaplas.com`
+(GESTOR), `beatriz.nogueira@metaltec.com` (GESTOR), `diego.ramos@siva.com`
+(TECNICO/MECANICO) e `marcos.vinicius@siva.com` (TECNICO/ELETRICISTA).
 
 ### Desenvolvimento — Opção 2: com MySQL de verdade
 

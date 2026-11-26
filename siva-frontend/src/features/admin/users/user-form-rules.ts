@@ -1,3 +1,4 @@
+import type { Company, TipoEmpresa } from '../../../types/company';
 import type {
   CreateUserPayload,
   Especialidade,
@@ -11,7 +12,7 @@ export interface UserFormValues {
   email: string;
   senha: string;
   tipo: UserType;
-  /** `''` significa "sem empresa vinculada". */
+  /** `''` significa "nenhuma empresa selecionada". */
   empresaId: string;
   /** `''` significa "sem especialidade". */
   especialidade: Especialidade | '';
@@ -30,18 +31,42 @@ export const EMPTY_USER_FORM: UserFormValues = {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const ALL_USER_TYPES: UserType[] = ['ADMIN', 'GESTOR', 'TECNICO'];
+
 /**
- * Regras de combinação tipo × empresa × especialidade.
+ * Perfis aceitos por tipo de empresa.
  *
  * Espelha `assertValidCombination` do back-end
  * (`src/modules/users/services/user.service.ts`):
- *  - ADMIN: sem empresa e sem especialidade;
- *  - GESTOR: empresa obrigatória, sem especialidade;
- *  - TECNICO: empresa e especialidade obrigatórias.
+ *  - SIVA: ADMIN ou TECNICO;
+ *  - empresa cliente: somente GESTOR.
+ *
+ * Sem empresa selecionada ainda não há regra a aplicar: o formulário mostra
+ * todas as opções e a validação exige a escolha da empresa no envio.
  */
+export function allowedUserTypes(tipo: TipoEmpresa | null): UserType[] {
+  if (tipo === 'SIVA') return ['ADMIN', 'TECNICO'];
+  if (tipo === 'CLIENTE') return ['GESTOR'];
+  return ALL_USER_TYPES;
+}
+
+/** Perfil assumido ao trocar para uma empresa que não aceita o perfil atual. */
+export function fallbackUserType(tipo: TipoEmpresa | null): UserType {
+  if (tipo === 'SIVA') return 'TECNICO';
+  return 'GESTOR';
+}
+
+export function companyTipoById(
+  companies: readonly Company[],
+  empresaId: string,
+): TipoEmpresa | null {
+  const company = companies.find((item) => String(item.id) === empresaId);
+  return company?.tipo ?? null;
+}
+
 export function validateUserForm(
   values: UserFormValues,
-  options: { isEditing: boolean },
+  options: { isEditing: boolean; companies: readonly Company[] },
 ): Record<string, string> {
   const errors: Record<string, string> = {};
 
@@ -69,10 +94,17 @@ export function validateUserForm(
     }
   }
 
-  if (values.tipo === 'GESTOR' || values.tipo === 'TECNICO') {
-    if (values.empresaId === '') {
-      errors.empresaId = 'Selecione a empresa do usuário.';
-    }
+  // Todo usuário pertence a uma empresa — inclusive o ADMIN, vinculado à SIVA.
+  const company = options.companies.find((item) => String(item.id) === values.empresaId);
+  if (values.empresaId === '') {
+    errors.empresaId = 'Selecione a empresa do usuário.';
+  } else if (!company) {
+    errors.empresaId = 'Selecione uma empresa válida.';
+  } else if (!allowedUserTypes(company.tipo).includes(values.tipo)) {
+    errors.tipo =
+      company.tipo === 'SIVA'
+        ? 'A SIVA aceita apenas os perfis Administrador ou Técnico.'
+        : 'Empresas clientes aceitam apenas o perfil Gestor.';
   }
 
   if (values.tipo === 'TECNICO' && values.especialidade === '') {
@@ -83,14 +115,12 @@ export function validateUserForm(
 }
 
 export function toCreatePayload(values: UserFormValues): CreateUserPayload {
-  const empresaId = values.empresaId === '' ? null : Number(values.empresaId);
-
   return {
     nome: values.nome.trim(),
     email: values.email.trim(),
     senha: values.senha,
     tipo: values.tipo,
-    empresaId: values.tipo === 'ADMIN' ? null : empresaId,
+    empresaId: values.empresaId === '' ? null : Number(values.empresaId),
     especialidade: values.tipo === 'TECNICO' ? values.especialidade || null : null,
     status: values.status,
   };
@@ -104,13 +134,11 @@ export function toCreatePayload(values: UserFormValues): CreateUserPayload {
  * o `tipo` sem ajustar os campos correlatos.
  */
 export function toUpdatePayload(values: UserFormValues): UpdateUserPayload {
-  const empresaId = values.empresaId === '' ? null : Number(values.empresaId);
-
   const payload: UpdateUserPayload = {
     nome: values.nome.trim(),
     email: values.email.trim(),
     tipo: values.tipo,
-    empresaId: values.tipo === 'ADMIN' ? null : empresaId,
+    empresaId: values.empresaId === '' ? null : Number(values.empresaId),
     especialidade: values.tipo === 'TECNICO' ? values.especialidade || null : null,
   };
 

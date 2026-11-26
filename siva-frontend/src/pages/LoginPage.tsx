@@ -13,13 +13,17 @@ export default function LoginPage() {
   const isCheckingSession = status === 'loading';
   const isAuthenticated = status === 'authenticated' && user !== null;
   const isAdmin = user?.tipo === 'ADMIN';
+  const isTecnico = user?.tipo === 'TECNICO';
 
-  // ADMIN vai para a área administrativa; os demais perfis, para o painel operacional.
+  // ADMIN vai para a área administrativa (incluindo as solicitações de
+  // serviço); TECNICO para sua única tela (ordens designadas); os demais
+  // perfis, para o painel operacional.
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(isAdmin ? '/admin' : '/painel', { replace: true });
+      const destination = isAdmin ? '/admin/solicitacoes' : isTecnico ? '/tecnico' : '/painel';
+      navigate(destination, { replace: true });
     }
-  }, [isAdmin, isAuthenticated, navigate]);
+  }, [isAdmin, isAuthenticated, isTecnico, navigate]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-siva-950 px-4 py-12">

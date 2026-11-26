@@ -38,6 +38,13 @@ async function assertFuncionarioValido(
   if (funcionario.empresaId === null || funcionario.empresaId !== setor.empresaId) {
     throw new ForbiddenError('Funcionário não pertence à empresa do sensor.');
   }
+  // Com o TECNICO restrito à SIVA, a manutenção interna da empresa cliente é
+  // executada pelo GESTOR dela.
+  if (funcionario.tipo !== 'GESTOR') {
+    throw new ForbiddenError(
+      'A manutenção interna deve ser atribuída ao gestor da empresa do sensor.',
+    );
+  }
 }
 
 export const maintenanceService = {

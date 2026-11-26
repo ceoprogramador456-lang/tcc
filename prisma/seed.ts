@@ -32,13 +32,25 @@ async function main(): Promise<void> {
 
   const empresa = await prisma.empresa.upsert({
     where: { cnpj: '12.345.678/0001-90' },
-    update: {},
-    create: { nome: 'Aquaplás Indústria Ltda', cnpj: '12.345.678/0001-90' },
+    update: { tipo: 'CLIENTE' },
+    create: { nome: 'Aquaplás Indústria Ltda', cnpj: '12.345.678/0001-90', tipo: 'CLIENTE' },
+  });
+
+  // Empresa dona do sistema. O CNPJ reservado garante a unicidade da SIVA.
+  const siva = await prisma.empresa.upsert({
+    where: { cnpj: '00.000.000/0001-00' },
+    update: { nome: 'SIVA', tipo: 'SIVA' },
+    create: { nome: 'SIVA', cnpj: '00.000.000/0001-00', tipo: 'SIVA' },
   });
 
   await prisma.usuario.upsert({
     where: { email: parsedConfig.data.SEED_ADMIN_EMAIL },
-    update: { senha: adminPasswordHash },
+    update: {
+      senha: adminPasswordHash,
+      tipo: 'ADMIN',
+      especialidade: null,
+      empresaId: siva.id,
+    },
     create: {
       nome: 'Administrador SIVA',
       email: parsedConfig.data.SEED_ADMIN_EMAIL,
@@ -46,13 +58,18 @@ async function main(): Promise<void> {
       tipo: 'ADMIN',
       especialidade: null,
       status: 'ATIVO',
-      empresaId: null,
+      empresaId: siva.id,
     },
   });
 
   const gestor = await prisma.usuario.upsert({
     where: { email: 'carla.mendes@aquaplas.com' },
-    update: { senha: gestorPasswordHash },
+    update: {
+      senha: gestorPasswordHash,
+      tipo: 'GESTOR',
+      especialidade: null,
+      empresaId: empresa.id,
+    },
     create: {
       nome: 'Carla Mendes',
       email: 'carla.mendes@aquaplas.com',
@@ -63,19 +80,42 @@ async function main(): Promise<void> {
       empresaId: empresa.id,
     },
   });
-  void gestor;
 
-  const tecnico = await prisma.usuario.upsert({
-    where: { email: 'diego.ramos@aquaplas.com' },
-    update: { senha: tecnicoPasswordHash },
+  await prisma.usuario.upsert({
+    where: { email: 'diego.ramos@siva.com' },
+    update: {
+      senha: tecnicoPasswordHash,
+      tipo: 'TECNICO',
+      especialidade: 'MECANICO',
+      empresaId: siva.id,
+    },
     create: {
       nome: 'Diego Ramos',
-      email: 'diego.ramos@aquaplas.com',
+      email: 'diego.ramos@siva.com',
       senha: tecnicoPasswordHash,
       tipo: 'TECNICO',
       especialidade: 'MECANICO',
       status: 'ATIVO',
-      empresaId: empresa.id,
+      empresaId: siva.id,
+    },
+  });
+
+  await prisma.usuario.upsert({
+    where: { email: 'marcos.vinicius@siva.com' },
+    update: {
+      senha: tecnicoPasswordHash,
+      tipo: 'TECNICO',
+      especialidade: 'ELETRICISTA',
+      empresaId: siva.id,
+    },
+    create: {
+      nome: 'Marcos Vinícius',
+      email: 'marcos.vinicius@siva.com',
+      senha: tecnicoPasswordHash,
+      tipo: 'TECNICO',
+      especialidade: 'ELETRICISTA',
+      status: 'ATIVO',
+      empresaId: siva.id,
     },
   });
 
@@ -115,7 +155,8 @@ async function main(): Promise<void> {
       sensorId: sensor.id,
       tipo: 'preventiva',
       descricao: 'Calibração inicial do sensor.',
-      funcionarioId: tecnico.id,
+      // Manutenção interna da empresa cliente: executada pelo GESTOR.
+      funcionarioId: gestor.id,
     },
   });
 

@@ -9,6 +9,7 @@ import { assertSameCompany, isAdmin } from '../../../shared/auth/scope.js';
 import type { ListOptions } from '../../../interfaces/repository.interface.js';
 import type { AuthenticatedUser } from '../../../types/express.js';
 import { createUserRepository } from '../repositories/user.repository.js';
+import { createCompanyRepository } from '../../companies/repositories/company.repository.js';
 import { toPublicUser } from '../entities/user.entity.js';
 import type { CreateUserDTO, UpdateUserDTO } from '../dtos/user.dtos.js';
 import { isPrismaError } from '../../../shared/errors/prisma-errors.js';
@@ -16,36 +17,43 @@ import { isPrismaError } from '../../../shared/errors/prisma-errors.js';
 const repository = createUserRepository();
 const SALT_ROUNDS = 10;
 
-function assertValidCombination(
+/**
+ * Regras de combinação entre perfil e natureza da empresa.
+ *
+ * - ADMIN e TECNICO pertencem à empresa SIVA;
+ * - GESTOR pertence a uma empresa CLIENTE;
+ * - TECNICO exige especialidade.
+ *
+ * A natureza da empresa vive no banco, por isso a validação é assíncrona e
+ * acontece no service (o Zod valida apenas o formato).
+ */
+async function assertValidCombination(
   tipo: string,
   empresaId: number | null | undefined,
   especialidade: string | null | undefined,
-): void {
-  if (tipo === 'ADMIN') {
-    if (empresaId !== undefined && empresaId !== null) {
-      throw new ValidationError('ADMIN não deve possuir empresaId.');
-    }
-    if (especialidade !== undefined && especialidade !== null) {
-      throw new ValidationError('ADMIN não deve possuir especialidade.');
-    }
+): Promise<void> {
+  if (empresaId === undefined || empresaId === null) {
+    throw new ValidationError('empresaId é obrigatório.');
   }
-  if (tipo === 'GESTOR') {
-    if (empresaId === undefined || empresaId === null) {
-      throw new ValidationError('empresaId é obrigatório para GESTOR.');
-    }
-    if (especialidade !== undefined && especialidade !== null) {
-      throw new ValidationError('GESTOR não deve possuir especialidade.');
-    }
+
+  const empresa = await createCompanyRepository().findById(empresaId);
+  if (!empresa) {
+    throw new ValidationError('Empresa informada não existe.');
   }
+
+  if (empresa.tipo === 'SIVA' && tipo === 'GESTOR') {
+    throw new ValidationError('Empresa SIVA permite apenas os perfis ADMIN ou TECNICO.');
+  }
+  if (empresa.tipo === 'CLIENTE' && tipo !== 'GESTOR') {
+    throw new ValidationError('Empresas clientes permitem apenas o perfil GESTOR.');
+  }
+
   if (tipo === 'TECNICO') {
-    if (empresaId === undefined || empresaId === null) {
-      throw new ValidationError('empresaId é obrigatório para TECNICO.');
-    }
     if (especialidade === undefined || especialidade === null) {
-      throw new ValidationError(
-        'especialidade é obrigatória para TECNICO (MECANICO ou ELETRICISTA).',
-      );
+      throw new ValidationError('TECNICO deve possuir especialidade (MECANICO ou ELETRICISTA).');
     }
+  } else if (especialidade !== undefined && especialidade !== null) {
+    throw new ValidationError(`${tipo} não deve possuir especialidade.`);
   }
 }
 
@@ -53,7 +61,8 @@ export const userService = {
   async list(actor: AuthenticatedUser, options: ListOptions = {}) {
     const filter = { ...(options.filter ?? {}) };
     if (!isAdmin(actor)) {
-      // GESTOR/TECNICO: somente a própria empresa, sem acesso global.
+      // GESTOR: somente a própria empresa, sem acesso global. TECNICO não
+      // acessa este módulo (bloqueado na rota).
       filter.empresaId = actor.empresaId ?? -1;
     }
     const { items, total } = await repository.list({ ...options, filter });
@@ -71,7 +80,7 @@ export const userService = {
     if (!isAdmin(actor)) {
       throw new ForbiddenError('Somente ADMIN pode criar usuários.');
     }
-    assertValidCombination(data.tipo, data.empresaId ?? null, data.especialidade ?? null);
+    await assertValidCombination(data.tipo, data.empresaId ?? null, data.especialidade ?? null);
 
     const existing = await repository.findByEmail(data.email);
     if (existing) throw new ConflictError('E-mail já cadastrado.');
@@ -107,7 +116,7 @@ export const userService = {
       data.especialidade !== undefined
         ? (data.especialidade ?? null)
         : (current.especialidade ?? null);
-    assertValidCombination(nextTipo, nextEmpresaId, nextEspecialidade);
+    await assertValidCombination(nextTipo, nextEmpresaId, nextEspecialidade);
 
     if (data.email && data.email !== current.email) {
       const existing = await repository.findByEmail(data.email);
@@ -118,9 +127,9 @@ export const userService = {
     const payload: Record<string, unknown> = { ...data };
     if (senha) payload.senha = senha;
     else delete payload.senha;
-    // Normaliza especialidade de ADMIN/GESTOR para null.
+    // Normaliza especialidade de ADMIN/GESTOR para null. ADMIN continua
+    // vinculado à SIVA, mas mantém autorização global pelo tipo.
     if (nextTipo !== 'TECNICO') payload.especialidade = null;
-    if (nextTipo === 'ADMIN') payload.empresaId = null;
 
     try {
       const user = await repository.update(id, payload as UpdateUserDTO);

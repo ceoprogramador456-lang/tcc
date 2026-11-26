@@ -71,6 +71,7 @@ export const openApiDocument = {
     { name: 'Sensors' },
     { name: 'Readings' },
     { name: 'Maintenances' },
+    { name: 'Ordens de Serviço' },
     { name: 'Alerts' },
     { name: 'Dashboard' },
   ],
@@ -86,6 +87,11 @@ export const openApiDocument = {
           id: { type: 'integer' },
           nome: { type: 'string' },
           cnpj: { type: 'string', nullable: true },
+          tipo: {
+            type: 'string',
+            enum: ['SIVA', 'CLIENTE'],
+            description: 'SIVA = empresa dona do sistema; CLIENTE = empresa contratante.',
+          },
           criadoEm: { type: 'string', format: 'date-time' },
         },
       },
@@ -255,16 +261,46 @@ export const openApiDocument = {
           descricao: { type: 'string', nullable: true },
         },
       },
+      OrdemServico: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          nome: { type: 'string' },
+          tipo: { type: 'string', enum: ['preventiva', 'corretiva', 'inspecao'] },
+          descricao: { type: 'string', nullable: true },
+          status: { type: 'string', enum: ['aberto', 'em_andamento', 'concluido'] },
+          empresaId: { type: 'integer' },
+          solicitanteId: { type: 'integer', description: 'GESTOR que criou a OS.' },
+          funcionarioId: {
+            type: 'integer',
+            nullable: true,
+            description: 'TECNICO ativo da SIVA designado para executar a OS.',
+          },
+          aceitoPor: { type: 'integer', nullable: true, description: 'ADMIN que aceitou.' },
+          aceitoEm: { type: 'string', format: 'date-time', nullable: true },
+          concluidoEm: { type: 'string', format: 'date-time', nullable: true },
+          criadoEm: { type: 'string', format: 'date-time' },
+          atualizadoEm: { type: 'string', format: 'date-time' },
+        },
+      },
       User: {
         type: 'object',
         properties: {
           id: { type: 'integer' },
           nome: { type: 'string' },
           email: { type: 'string' },
-          tipo: { type: 'string', enum: ['ADMIN', 'GESTOR', 'TECNICO'] },
+          tipo: {
+            type: 'string',
+            enum: ['ADMIN', 'GESTOR', 'TECNICO'],
+            description:
+              'TECNICO é exclusivo de empresa SIVA; empresa cliente aceita somente GESTOR.',
+          },
           especialidade: { type: 'string', enum: ['MECANICO', 'ELETRICISTA'], nullable: true },
           status: { type: 'string', enum: ['ATIVO', 'INATIVO'] },
-          empresaId: { type: 'integer', nullable: true },
+          empresaId: {
+            type: 'integer',
+            description: 'Obrigatório para todos os perfis; ADMIN vinculado à SIVA.',
+          },
         },
       },
       LoginRequest: {
@@ -510,6 +546,104 @@ export const openApiDocument = {
         summary: 'Abre um chamado de manutenção.',
         security: [bearerAuth],
         responses: { '201': itemResponse('#/components/schemas/Maintenance') },
+      },
+    },
+    '/solicitacoes-servico': {
+      get: {
+        tags: ['Ordens de Serviço'],
+        summary:
+          'Lista ordens de serviço. ADMIN: todas; GESTOR: da própria empresa; TECNICO: somente as designadas a ele.',
+        security: [bearerAuth],
+        parameters: [
+          ...paginationParams,
+          {
+            name: 'status',
+            in: 'query',
+            schema: { type: 'string', enum: ['aberto', 'em_andamento', 'concluido'] },
+          },
+          { name: 'empresaId', in: 'query', schema: { type: 'integer' } },
+        ],
+        responses: { '200': paginatedResponse('#/components/schemas/OrdemServico') },
+      },
+      post: {
+        tags: ['Ordens de Serviço'],
+        summary: 'Cria uma OS na empresa do GESTOR autenticado (status inicial aberto).',
+        security: [bearerAuth],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['nome', 'tipo'],
+                properties: {
+                  nome: { type: 'string' },
+                  tipo: { type: 'string', enum: ['preventiva', 'corretiva', 'inspecao'] },
+                  descricao: { type: 'string', nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': itemResponse('#/components/schemas/OrdemServico') },
+      },
+    },
+    '/solicitacoes-servico/{id}': {
+      get: {
+        tags: ['Ordens de Serviço'],
+        summary: 'Detalhe da OS. ADMIN ou o TECNICO designado (os demais recebem 403).',
+        security: [bearerAuth],
+        parameters: [idParam],
+        responses: { '200': itemResponse('#/components/schemas/OrdemServico') },
+      },
+      patch: {
+        tags: ['Ordens de Serviço'],
+        summary: 'Troca o técnico responsável (ADMIN; OS aberta ou em andamento).',
+        security: [bearerAuth],
+        parameters: [idParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['funcionarioId'],
+                properties: { funcionarioId: { type: 'integer' } },
+              },
+            },
+          },
+        },
+        responses: { '200': itemResponse('#/components/schemas/OrdemServico') },
+      },
+    },
+    '/solicitacoes-servico/{id}/aceitar': {
+      post: {
+        tags: ['Ordens de Serviço'],
+        summary: 'Aceita a OS e designa um TECNICO ativo da SIVA (ADMIN).',
+        security: [bearerAuth],
+        parameters: [idParam],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['funcionarioId'],
+                properties: { funcionarioId: { type: 'integer' } },
+              },
+            },
+          },
+        },
+        responses: { '200': itemResponse('#/components/schemas/OrdemServico') },
+      },
+    },
+    '/solicitacoes-servico/{id}/concluir': {
+      post: {
+        tags: ['Ordens de Serviço'],
+        summary: 'Conclui uma OS em andamento (ADMIN).',
+        security: [bearerAuth],
+        parameters: [idParam],
+        responses: { '200': itemResponse('#/components/schemas/OrdemServico') },
       },
     },
     '/alerts': {

@@ -1,4 +1,4 @@
-import { Activity, Cpu, LayoutDashboard, Radio, Warehouse } from 'lucide-react';
+import { Activity, Cpu, LayoutDashboard, Radio, Warehouse, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface PanelNavItem {
@@ -17,6 +17,12 @@ export const PANEL_NAV_ITEMS: PanelNavItem[] = [
     description: 'Consumo, sensores e atividades',
     icon: LayoutDashboard,
     end: true,
+  },
+  {
+    to: '/painel/solicitacoes',
+    label: 'Solicitações',
+    description: 'Ordens de serviço para a equipe executar',
+    icon: Wrench,
   },
   {
     to: '/painel/setores',

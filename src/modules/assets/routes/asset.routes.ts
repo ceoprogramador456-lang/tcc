@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorize } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, authorize, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { assetController } from '../controllers/asset.controller.js';
 import {
@@ -11,9 +11,14 @@ import {
 
 export const assetRoutes = Router();
 
-assetRoutes.use(authenticateUser);
+assetRoutes.use(authenticateUser, denyTecnico);
 
-assetRoutes.get('/', validate({ query: listAssetsQuerySchema }), assetController.list);
+assetRoutes.get(
+  '/',
+  authorize('GESTOR'),
+  validate({ query: listAssetsQuerySchema }),
+  assetController.list,
+);
 assetRoutes.get('/:id', validate({ params: assetIdParamSchema }), assetController.getById);
 assetRoutes.post(
   '/',

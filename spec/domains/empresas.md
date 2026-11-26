@@ -2,8 +2,15 @@
 
 **Status: IMPLEMENTADO**
 
-- Entidade/tabela: `Empresa` → `empresa` (`id`, `nome`, `cnpj? unique`, `criado_em`).
+- Entidade/tabela: `Empresa` → `empresa` (`id`, `nome`, `cnpj? unique`,
+  `tipo`, `criado_em`).
 - Relações: 1-N `Usuario`, 1-N `Setor`.
-- Notas: CRUD escrita só `super_admin`; leitura escopada (`company.service`
-  filtra `id = empresaId ?? -1` p/ não-super). Sem `Empresa.tipo
-  (vendedora|cliente)` — PLANEJADO (ver `spec/business-rules/multi-empresa.md`).
+- `tipo` (`TipoEmpresa`): `SIVA` (dona do sistema) ou `CLIENTE` (empresa que
+  adquiriu o sistema). Default `CLIENTE`.
+- A SIVA é única e identificada pelo CNPJ reservado `00.000.000/0001-00`,
+  garantido por migration/seed. Ela concentra os usuários `ADMIN` e `TECNICO`.
+- CRUD:
+  - leitura: `ADMIN` vê todas; `GESTOR` vê somente a própria; `TECNICO` não acessa;
+  - escrita: somente `ADMIN`;
+  - empresas criadas pela API nascem sempre `CLIENTE` (o `tipo` não é aceito no payload);
+  - a SIVA não pode ser editada nem excluída (`409`).
