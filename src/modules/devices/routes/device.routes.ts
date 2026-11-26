@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorize } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, authorize, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { deviceController } from '../controllers/device.controller.js';
 import {
@@ -11,7 +11,7 @@ import {
 
 export const deviceRoutes = Router();
 
-deviceRoutes.use(authenticateUser);
+deviceRoutes.use(authenticateUser, denyTecnico);
 
 deviceRoutes.get('/', validate({ query: listDevicesQuerySchema }), deviceController.list);
 deviceRoutes.get('/:id', validate({ params: deviceIdParamSchema }), deviceController.getById);

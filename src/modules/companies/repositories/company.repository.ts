@@ -12,10 +12,17 @@ import type { CreateCompanyDTO, UpdateCompanyDTO } from '../dtos/company.dtos.js
 
 export type CompanyRepository = CrudRepository<Company, CreateCompanyDTO, UpdateCompanyDTO>;
 
+function buildWhere(filter: Record<string, unknown>) {
+  const where: Record<string, unknown> = {};
+  if (filter.id !== undefined) where.id = Number(filter.id);
+  if (filter.tipo !== undefined) where.tipo = filter.tipo;
+  return where;
+}
+
 const prismaRepository: CompanyRepository = {
   async list(options: ListOptions = {}): Promise<ListResult<Company>> {
     const { page = 1, pageSize = 20, filter = {} } = options;
-    const where = filter.id ? { id: Number(filter.id) } : {};
+    const where = buildWhere(filter);
     const [items, total] = await Promise.all([
       prisma.empresa.findMany({
         where,
@@ -54,6 +61,8 @@ const prismaRepository: CompanyRepository = {
 
 export function createCompanyRepository(): CompanyRepository {
   return env.MOCK_MODE
-    ? createMockRepository(companiesMock, { defaults: () => ({ criadoEm: new Date() }) })
+    ? createMockRepository(companiesMock, {
+        defaults: () => ({ criadoEm: new Date(), tipo: 'CLIENTE' }),
+      })
     : prismaRepository;
 }

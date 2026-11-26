@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { maintenanceController } from '../controllers/maintenance.controller.js';
 import {
@@ -11,7 +11,7 @@ import {
 
 export const maintenanceRoutes = Router();
 
-maintenanceRoutes.use(authenticateUser);
+maintenanceRoutes.use(authenticateUser, denyTecnico);
 
 maintenanceRoutes.get(
   '/',

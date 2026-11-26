@@ -5,6 +5,7 @@ import {
 } from '../../../shared/errors/app-error.js';
 import { isAdmin } from '../../../shared/auth/scope.js';
 import { createUserRepository } from '../../users/repositories/user.repository.js';
+import { createCompanyRepository } from '../../companies/repositories/company.repository.js';
 import { createOrdemServicoRepository } from '../repositories/ordemServico.repository.js';
 import type { OrdemServico } from '../entities/ordemServico.entity.js';
 import type {
@@ -23,17 +24,47 @@ const repository = createOrdemServicoRepository();
  * Transições válidas de status: `aberto` → `em_andamento` → `concluido`.
  * - GESTOR: cria (empresa + solicitante derivados do ator, nunca do cliente) e
  *   lista as solicitações da própria empresa.
+ * - TECNICO (funcionário da SIVA): lista e visualiza somente as ordens em que
+ *   é o `funcionarioId` designado.
  * - ADMIN: lista todas (com filtro opcional de empresa), aceita (designa
- *   funcionário) e conclui.
+ *   técnico da SIVA) e conclui.
  */
+
+/** Garante que o funcionário designado é um técnico ativo da SIVA. */
+async function findTecnicoSiva(funcionarioId: number) {
+  const funcionario = await createUserRepository().findById(funcionarioId);
+  if (!funcionario) throw new NotFoundError('Funcionário');
+  if (funcionario.status === 'INATIVO') {
+    throw new ValidationError('Funcionário inativo não pode ser designado.');
+  }
+  if (funcionario.tipo !== 'TECNICO' || funcionario.empresaId === null) {
+    throw new ForbiddenError('Funcionário deve ser um técnico ativo da SIVA.');
+  }
+
+  const empresa = await createCompanyRepository().findById(funcionario.empresaId);
+  if (!empresa || empresa.tipo !== 'SIVA') {
+    throw new ForbiddenError('Funcionário deve ser um técnico ativo da SIVA.');
+  }
+  return funcionario;
+}
+
 export const ordemServicoService = {
   async list(user: AuthenticatedUser, options: ListOptions = {}) {
+    const filter = { ...(options.filter ?? {}) };
+
+    // O técnico da SIVA atua em ordens de empresas clientes; o vínculo dele
+    // com a OS é `funcionarioId`, não `empresaId`.
+    if (user.tipo === 'TECNICO') {
+      delete filter.empresaId;
+      filter.funcionarioId = user.id;
+      return repository.list({ ...options, filter });
+    }
+
     if (!isAdmin(user) && user.empresaId === null) {
       throw new ValidationError(
         'Empresa do usuário não identificada para listar ordens de serviço.',
       );
     }
-    const filter = { ...(options.filter ?? {}) };
     if (!isAdmin(user)) filter.empresaId = user.empresaId;
     return repository.list({ ...options, filter });
   },
@@ -41,13 +72,27 @@ export const ordemServicoService = {
   async getAccessible(user: AuthenticatedUser, id: number): Promise<OrdemServico> {
     const ordem = await repository.findById(id);
     if (!ordem) throw new NotFoundError('Ordem de serviço');
+
+    if (isAdmin(user)) return ordem;
+
+    if (user.tipo === 'TECNICO') {
+      if (ordem.funcionarioId !== user.id) {
+        throw new ForbiddenError('Você não tem acesso a esta ordem de serviço.');
+      }
+      return ordem;
+    }
+
+    if (user.empresaId === null || ordem.empresaId !== user.empresaId) {
+      throw new ForbiddenError('Você não tem acesso a esta ordem de serviço.');
+    }
     return ordem;
   },
 
-  /** Detalhe completo — para visualização (ADMIN). */
+  /** Detalhe completo — ADMIN ou o técnico designado. */
   async getById(user: AuthenticatedUser, id: number): Promise<OrdemServico> {
-    if (!isAdmin(user))
-      throw new ForbiddenError('Somente ADMIN pode visualizar a ordem de serviço.');
+    if (!isAdmin(user) && user.tipo !== 'TECNICO') {
+      throw new ForbiddenError('Somente ADMIN ou o técnico designado pode visualizar a ordem.');
+    }
     return this.getAccessible(user, id);
   },
 
@@ -64,14 +109,7 @@ export const ordemServicoService = {
       );
     }
 
-    const funcionario = await createUserRepository().findById(funcionarioId);
-    if (!funcionario) throw new NotFoundError('Funcionário');
-    if (funcionario.status === 'INATIVO') {
-      throw new ValidationError('Funcionário inativo não pode ser designado.');
-    }
-    if (funcionario.tipo !== 'TECNICO' || funcionario.empresaId !== current.empresaId) {
-      throw new ForbiddenError('Funcionário não é um executor válido para esta empresa.');
-    }
+    const funcionario = await findTecnicoSiva(funcionarioId);
     if (funcionario.id === current.funcionarioId) return current;
 
     const updated = await repository.update(id, { funcionarioId: funcionario.id });
@@ -80,7 +118,7 @@ export const ordemServicoService = {
   },
 
   async create(user: AuthenticatedUser, data: CreateOrdemServicoDTO) {
-    if (!isAdmin(user) && user.tipo !== 'GESTOR') {
+    if (user.tipo !== 'GESTOR') {
       throw new ForbiddenError('Somente GESTOR pode criar ordens de serviço.');
     }
     if (user.empresaId === null) {
@@ -110,14 +148,7 @@ export const ordemServicoService = {
       throw new ValidationError('Só é possível aceitar uma solicitação em status "aberto".');
     }
 
-    const funcionario = await createUserRepository().findById(data.funcionarioId);
-    if (!funcionario) throw new NotFoundError('Funcionário');
-    if (funcionario.status === 'INATIVO') {
-      throw new ValidationError('Funcionário inativo não pode ser designado.');
-    }
-    if (funcionario.tipo !== 'TECNICO' || funcionario.empresaId !== current.empresaId) {
-      throw new ForbiddenError('Funcionário não é um executor válido para esta empresa.');
-    }
+    const funcionario = await findTecnicoSiva(data.funcionarioId);
 
     const update: UpdateOrdemServicoDTO = {
       status: 'em_andamento',

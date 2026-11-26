@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorize } from '../../../middlewares/auth.middleware.js';
+import { authenticateUser, authorize, denyTecnico } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { sensorController } from '../controllers/sensor.controller.js';
 import {
@@ -11,7 +11,7 @@ import {
 
 export const sensorRoutes = Router();
 
-sensorRoutes.use(authenticateUser);
+sensorRoutes.use(authenticateUser, denyTecnico);
 
 sensorRoutes.get('/', validate({ query: listSensorsQuerySchema }), sensorController.list);
 sensorRoutes.get('/:id', validate({ params: sensorIdParamSchema }), sensorController.getById);

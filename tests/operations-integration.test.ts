@@ -8,7 +8,7 @@ const app = createApp();
 
 const ADMIN = { email: 'super@siva.com', senha: 'senha123' };
 const GESTOR = { email: 'carla.mendes@aquaplas.com', senha: 'senha123' };
-const TECNICO = { email: 'diego.ramos@aquaplas.com', senha: 'senha123' };
+const TECNICO = { email: 'diego.ramos@siva.com', senha: 'senha123' };
 
 async function tokenDe(email: string, senha: string): Promise<string> {
   const response = await request(app).post('/api/auth/login').send({ email, senha });
@@ -165,27 +165,33 @@ describe('Escopo multiempresa dos recursos operacionais', () => {
     expect(assets.status).toBe(403);
   });
 
-  it('TECNICO também fica restrito à própria empresa', async () => {
-    const admin = await request(app)
-      .get('/api/sensors')
-      .set('Authorization', `Bearer ${adminToken}`);
+  it('TECNICO não acessa sensores nem outros módulos operacionais (403)', async () => {
     const sensors = await request(app)
       .get('/api/sensors')
       .set('Authorization', `Bearer ${tecnicoToken}`);
+    expect(sensors.status).toBe(403);
 
-    expect(sensors.status).toBe(200);
-    // O técnico vê menos (ou igual) sensores que o admin global.
-    expect(sensors.body.meta.total).toBeLessThan(admin.body.meta.total);
-    expect(sensors.body.meta.total).toBeGreaterThan(0);
+    for (const path of [
+      '/api/assets',
+      '/api/devices',
+      '/api/maintenances?sensorId=1',
+      '/api/alerts',
+      '/api/readings?sensorId=1',
+      '/api/companies',
+      '/api/users',
+      '/api/dashboard/overview',
+    ]) {
+      const response = await request(app).get(path).set('Authorization', `Bearer ${tecnicoToken}`);
+      expect(response.status, path).toBe(403);
+    }
   });
 
-  it('um recurso de outra empresa não é acessível por ID (404/403)', async () => {
-    // `esp_03` pertence à Metaltec (empresa 2).
+  it('TECNICO não acessa dispositivo por ID (403)', async () => {
     const response = await request(app)
       .get('/api/devices/3')
       .set('Authorization', `Bearer ${tecnicoToken}`);
 
-    expect([403, 404]).toContain(response.status);
+    expect(response.status).toBe(403);
   });
 
   it('TECNICO não pode criar dispositivos (só ADMIN e GESTOR)', async () => {

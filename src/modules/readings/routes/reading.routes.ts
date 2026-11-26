@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { authenticateDevice, authenticateUser } from '../../../middlewares/auth.middleware.js';
+import {
+  authenticateDevice,
+  authenticateUser,
+  denyTecnico,
+} from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { readingController } from '../controllers/reading.controller.js';
 import { ingestReadingSchema, listReadingsQuerySchema } from '../validators/reading.validators.js';
@@ -17,6 +21,7 @@ readingRoutes.post(
 readingRoutes.get(
   '/',
   authenticateUser,
+  denyTecnico,
   validate({ query: listReadingsQuerySchema }),
   readingController.list,
 );

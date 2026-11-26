@@ -24,6 +24,7 @@ function buildWhere(filter: Record<string, unknown>) {
   if (filter.id !== undefined) where.id = Number(filter.id);
   if (filter.empresaId !== undefined) where.empresaId = Number(filter.empresaId);
   if (filter.solicitanteId !== undefined) where.solicitanteId = Number(filter.solicitanteId);
+  if (filter.funcionarioId !== undefined) where.funcionarioId = Number(filter.funcionarioId);
   if (filter.status !== undefined) where.status = filter.status;
   return where;
 }

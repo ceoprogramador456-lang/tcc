@@ -52,6 +52,21 @@ export function authorize(...allowed: AuthenticatedUser['tipo'][]) {
   };
 }
 
+/**
+ * Bloqueia o perfil TECNICO em módulos que não fazem parte da área dele.
+ *
+ * O TECNICO só acessa as ordens de serviço designadas a ele; todo o restante
+ * (empresas, usuários, setores, ativos, dispositivos, sensores, leituras,
+ * manutenções, alertas e dashboard) retorna 403.
+ */
+export function denyTecnico(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user) throw new UnauthorizedError();
+  if (req.user.tipo === 'TECNICO') {
+    throw new ForbiddenError('Acesso não permitido para o perfil TÉCNICO.');
+  }
+  next();
+}
+
 /** Autentica dispositivos ESP32 via `X-Token`, conforme payload descrito no README. */
 export async function authenticateDevice(
   req: Request,

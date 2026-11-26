@@ -3,17 +3,23 @@ create DATABASE if not EXISTS siva_db;
 use siva_db;
 
 -- ============================================================
--- EMPRESA (cliente que adquiriu o sistema)
+-- EMPRESA
+--   SIVA    -> empresa dona do sistema (ADMIN e TECNICO)
+--   CLIENTE -> empresa que adquiriu o sistema (GESTOR)
 -- ============================================================
 CREATE TABLE empresa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     cnpj VARCHAR(20) UNIQUE,
+    tipo ENUM('SIVA', 'CLIENTE') NOT NULL DEFAULT 'CLIENTE',
     criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
--- USUARIO (você/super_admin, admins da empresa, funcionários)
+-- USUARIO
+--   ADMIN   -> vinculado à SIVA (acesso global por perfil)
+--   GESTOR  -> vinculado a uma empresa CLIENTE
+--   TECNICO -> vinculado à SIVA, com especialidade
 -- ============================================================
 CREATE TABLE usuario (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,7 +29,7 @@ CREATE TABLE usuario (
     tipo ENUM('ADMIN', 'GESTOR', 'TECNICO') NOT NULL,
     especialidade ENUM('MECANICO', 'ELETRICISTA') NULL, -- obrigatória apenas para TECNICO
     status ENUM('ATIVO', 'INATIVO') NOT NULL DEFAULT 'ATIVO',
-    empresa_id INT NULL,              -- NULL apenas para ADMIN
+    empresa_id INT NULL,
     criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (empresa_id) REFERENCES empresa(id)
 );
@@ -147,6 +153,12 @@ CREATE INDEX idx_ativo_criticidade ON ativo (criticidade);
 CREATE INDEX idx_ordem_servico_status ON ordem_servico (status);
 CREATE INDEX idx_ordem_servico_empresa ON ordem_servico (empresa_id);
 
+-- Empresa dona do sistema (obrigatória para ADMIN e TECNICO).
+INSERT INTO empresa (nome, cnpj, tipo)
+VALUES ('SIVA', '00.000.000/0001-00', 'SIVA');
+
+SET @siva_id = (SELECT id FROM empresa WHERE cnpj = '00.000.000/0001-00');
+
 INSERT INTO usuario (
     nome,
     email,
@@ -161,6 +173,6 @@ INSERT INTO usuario (
     'Admin123', 'ADMIN',
     NULL,
     'ATIVO',
-    NULL
+    @siva_id
 );
 

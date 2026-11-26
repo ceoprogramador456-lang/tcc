@@ -33,6 +33,18 @@ enum StatusUsuario {
   @@map("status_usuario")
 }
 
+/**
+ * Natureza da empresa.
+ * - SIVA: empresa dona do sistema. Concentra ADMIN e TECNICO.
+ * - CLIENTE: empresa que adquire o sistema. Concentra GESTOR.
+ */
+enum TipoEmpresa {
+  SIVA
+  CLIENTE
+
+  @@map("tipo_empresa")
+}
+
 enum Criticidade {
   baixa
   media
@@ -52,10 +64,11 @@ enum StatusManutencao {
 }
 
 model Empresa {
-  id       Int      @id @default(autoincrement())
-  nome     String   @db.VarChar(100)
-  cnpj     String?  @unique @db.VarChar(20)
-  criadoEm DateTime @default(now()) @map("criado_em")
+  id       Int         @id @default(autoincrement())
+  nome     String      @db.VarChar(100)
+  cnpj     String?     @unique @db.VarChar(20)
+  tipo     TipoEmpresa @default(CLIENTE)
+  criadoEm DateTime    @default(now()) @map("criado_em")
 
   usuarios      Usuario[]
   setores       Setor[]

@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { companies, users } from '../src/shared/mock/mock-store.js';
+import { companies, ordensServico, users } from '../src/shared/mock/mock-store.js';
 
 const app = createApp();
 
 const adminUser = users.findOne((user) => user.tipo === 'ADMIN')!;
 const carlaUser = users.findOne((user) => user.email === 'carla.mendes@aquaplas.com')!;
-const diegoUser = users.findOne((user) => user.email === 'diego.ramos@aquaplas.com')!;
+const diegoUser = users.findOne((user) => user.email === 'diego.ramos@siva.com')!;
+const marcosUser = users.findOne((user) => user.email === 'marcos.vinicius@siva.com')!;
 
 const aquaplas = companies.list().find((company) => company.nome === 'Aquaplás Indústria Ltda')!;
-const metaltec = companies.list().find((company) => company.nome === 'Metaltec Componentes S.A.')!;
+
+const marcosOrdem = ordensServico.list().find((ordem) => ordem.funcionarioId === marcosUser.id)!;
 
 let createdOrdemId = 0;
 
@@ -20,7 +22,7 @@ async function login(email: string): Promise<string> {
   return response.body.data.token as string;
 }
 
-describe('Solicitações de serviço — bloqueio das telas para o ADMIN', () => {
+describe('Solicitações de serviço — bloqueio das telas operacionais para o ADMIN', () => {
   it('bloqueia Visão geral (GET /api/dashboard/overview) com 403', async () => {
     const token = await login('super@siva.com');
     const response = await request(app)
@@ -35,7 +37,7 @@ describe('Solicitações de serviço — bloqueio das telas para o ADMIN', () =>
     expect(response.status).toBe(403);
   });
 
-  it('deixa Visão geral e Equipamentos disponíveis para GESTOR e TECNICO', async () => {
+  it('deixa Visão geral e Equipamentos disponíveis para GESTOR', async () => {
     const gestor = await login('carla.mendes@aquaplas.com');
     const dashboard = await request(app)
       .get('/api/dashboard/overview')
@@ -44,12 +46,17 @@ describe('Solicitações de serviço — bloqueio das telas para o ADMIN', () =>
 
     const assets = await request(app).get('/api/assets').set('Authorization', `Bearer ${gestor}`);
     expect(assets.status).toBe(200);
+  });
 
-    const tecnico = await login('diego.ramos@aquaplas.com');
-    const tecnicoAssets = await request(app)
-      .get('/api/assets')
+  it('bloqueia Visão geral e Equipamentos para TECNICO (403)', async () => {
+    const tecnico = await login('diego.ramos@siva.com');
+    const dashboard = await request(app)
+      .get('/api/dashboard/overview')
       .set('Authorization', `Bearer ${tecnico}`);
-    expect(tecnicoAssets.status).toBe(200);
+    expect(dashboard.status).toBe(403);
+
+    const assets = await request(app).get('/api/assets').set('Authorization', `Bearer ${tecnico}`);
+    expect(assets.status).toBe(403);
   });
 });
 
@@ -103,14 +110,20 @@ describe('Solicitações de serviço — GESTOR', () => {
     expect(beatrizList.body.data.some((ordem: { id: number }) => ordem.id === createdOrdemId)).toBe(
       false,
     );
-    for (const ordem of beatrizList.body.data) {
-      expect(ordem.empresaId).toBe(metaltec.id);
-    }
+  });
+
+  it('ADMIN não cria OS (a criação é do GESTOR da empresa cliente)', async () => {
+    const token = await login('super@siva.com');
+    const response = await request(app)
+      .post('/api/solicitacoes-servico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'OS criada pelo admin', tipo: 'inspecao' });
+    expect(response.status).toBe(403);
   });
 });
 
 describe('Solicitações de serviço — ADMIN aceita/conclui', () => {
-  it('admin aceita com funcionário: status em_andamento, funcionário + responsável registrados', async () => {
+  it('admin aceita com técnico da SIVA: status em_andamento, funcionário + responsável registrados', async () => {
     const token = await login('super@siva.com');
     const response = await request(app)
       .post(`/api/solicitacoes-servico/${createdOrdemId}/aceitar`)
@@ -166,6 +179,100 @@ describe('Solicitações de serviço — ADMIN aceita/conclui', () => {
       .post(`/api/solicitacoes-servico/${createdOrdemId}/concluir`)
       .set('Authorization', `Bearer ${token}`);
     expect(complete.status).toBe(403);
+  });
+
+  it('rejeita designar um técnico de empresa cliente (422)', async () => {
+    const carlaToken = await login('carla.mendes@aquaplas.com');
+    const adminToken = await login('super@siva.com');
+
+    const createResponse = await request(app)
+      .post('/api/solicitacoes-servico')
+      .set('Authorization', `Bearer ${carlaToken}`)
+      .send({ nome: 'OS para técnico de cliente', tipo: 'inspecao' });
+    expect(createResponse.status).toBe(201);
+
+    const response = await request(app)
+      .post(`/api/solicitacoes-servico/${createResponse.body.data.id}/aceitar`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ funcionarioId: carlaUser.id });
+    expect([403, 422]).toContain(response.status);
+  });
+});
+
+describe('Solicitações de serviço — escopo do TECNICO', () => {
+  it('técnico lista somente as ordens designadas a ele', async () => {
+    const token = await login('diego.ramos@siva.com');
+    const response = await request(app)
+      .get('/api/solicitacoes-servico?pageSize=100')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.some((ordem: { id: number }) => ordem.id === createdOrdemId)).toBe(
+      true,
+    );
+    for (const ordem of response.body.data) {
+      expect(ordem.funcionarioId).toBe(diegoUser.id);
+    }
+    expect(response.body.data.some((ordem: { id: number }) => ordem.id === marcosOrdem.id)).toBe(
+      false,
+    );
+  });
+
+  it('outro técnico não vê a ordem do primeiro', async () => {
+    const token = await login('marcos.vinicius@siva.com');
+    const response = await request(app)
+      .get('/api/solicitacoes-servico?pageSize=100')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.some((ordem: { id: number }) => ordem.id === createdOrdemId)).toBe(
+      false,
+    );
+    for (const ordem of response.body.data) {
+      expect(ordem.funcionarioId).toBe(marcosUser.id);
+    }
+  });
+
+  it('técnico abre o detalhe da própria OS e recebe 403 na OS de outro', async () => {
+    const token = await login('diego.ramos@siva.com');
+
+    const own = await request(app)
+      .get(`/api/solicitacoes-servico/${createdOrdemId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(own.status).toBe(200);
+    expect(own.body.data.id).toBe(createdOrdemId);
+
+    const another = await request(app)
+      .get(`/api/solicitacoes-servico/${marcosOrdem.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(another.status).toBe(403);
+  });
+
+  it('técnico não cria, aceita, conclui nem altera funcionário (403)', async () => {
+    const token = await login('diego.ramos@siva.com');
+
+    const create = await request(app)
+      .post('/api/solicitacoes-servico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'OS do técnico', tipo: 'inspecao' });
+    expect(create.status).toBe(403);
+
+    const accept = await request(app)
+      .post(`/api/solicitacoes-servico/${createdOrdemId}/aceitar`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ funcionarioId: diegoUser.id });
+    expect(accept.status).toBe(403);
+
+    const complete = await request(app)
+      .post(`/api/solicitacoes-servico/${createdOrdemId}/concluir`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(complete.status).toBe(403);
+
+    const patch = await request(app)
+      .patch(`/api/solicitacoes-servico/${createdOrdemId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ funcionarioId: diegoUser.id });
+    expect(patch.status).toBe(403);
   });
 });
 

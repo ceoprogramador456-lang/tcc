@@ -16,12 +16,15 @@ ordemServicoRoutes.use(authenticateUser);
 
 ordemServicoRoutes.get(
   '/',
+  authorize('ADMIN', 'GESTOR', 'TECNICO'),
   validate({ query: listOrdensServicoQuerySchema }),
   ordemServicoController.list,
 );
 
+// A criação é do GESTOR da empresa cliente; o ADMIN não cria OS para a SIVA.
 ordemServicoRoutes.post(
   '/',
+  authorize('GESTOR'),
   validate({ body: createOrdemServicoSchema }),
   ordemServicoController.create,
 );
@@ -42,8 +45,8 @@ ordemServicoRoutes.post(
 
 ordemServicoRoutes.get(
   '/:id',
+  authorize('ADMIN', 'TECNICO'),
   validate({ params: ordemServicoIdParamSchema }),
-  authorize('ADMIN'),
   ordemServicoController.getById,
 );
 

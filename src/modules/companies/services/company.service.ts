@@ -1,4 +1,4 @@
-import { NotFoundError } from '../../../shared/errors/app-error.js';
+import { ConflictError, NotFoundError } from '../../../shared/errors/app-error.js';
 import { assertSameCompany, isAdmin } from '../../../shared/auth/scope.js';
 import type { ListOptions } from '../../../interfaces/repository.interface.js';
 import type { AuthenticatedUser } from '../../../types/express.js';
@@ -30,16 +30,30 @@ export const companyService = {
   },
 
   create(data: CreateCompanyDTO) {
-    return repository.create(data);
+    // Empresas criadas pela API são sempre clientes; a SIVA é criada por
+    // migration/seed e não pode ser duplicada.
+    return repository.create({ ...data, tipo: 'CLIENTE' });
   },
 
   async update(id: number, data: UpdateCompanyDTO) {
+    const current = await repository.findById(id);
+    if (!current) throw new NotFoundError('Empresa');
+    if (current.tipo === 'SIVA') {
+      throw new ConflictError('A empresa SIVA não pode ser alterada.');
+    }
+
     const company = await repository.update(id, data);
     if (!company) throw new NotFoundError('Empresa');
     return company;
   },
 
   async remove(id: number) {
+    const current = await repository.findById(id);
+    if (!current) throw new NotFoundError('Empresa');
+    if (current.tipo === 'SIVA') {
+      throw new ConflictError('A empresa SIVA não pode ser excluída.');
+    }
+
     try {
       const removed = await repository.remove(id);
       if (!removed) throw new NotFoundError('Empresa');
@@ -47,7 +61,6 @@ export const companyService = {
       if (error instanceof NotFoundError) throw error;
       const code = (error as { code?: string }).code;
       if (code === 'P2003' || code === 'P2014') {
-        const { ConflictError } = await import('../../../shared/errors/app-error.js');
         throw new ConflictError(
           'Empresa possui setores/usuários vinculados e não pode ser excluída.',
         );
