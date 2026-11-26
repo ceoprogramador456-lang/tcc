@@ -12,10 +12,25 @@ services:
     volumes:
       - siva_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-p$$MYSQL_ROOT_PASSWORD']
+      test:
+        [
+          'CMD-SHELL',
+          'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql --protocol=tcp -h 127.0.0.1 -uroot -e "SELECT 1"',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: build
+    environment:
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/siva_db
+    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   api:
     build:
@@ -27,14 +42,18 @@ services:
       MOCK_MODE: 'false'
       DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/siva_db
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      TRUST_PROXY_HOPS: '1'
+      PAIRING_COMPANY_ID: ${PAIRING_COMPANY_ID:?defina a empresa desta instalação}
+      PAIRING_KEY: ${PAIRING_KEY:?defina uma chave de pareamento persistente}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
-    command: sh -c "npx prisma migrate deploy && node dist/server.js"
     depends_on:
-      mysql:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   caddy:
     image: caddy:2-alpine
+    environment:
+      SIVA_API_DOMAIN: ${SIVA_API_DOMAIN:?defina o domínio HTTPS da API}
     restart: unless-stopped
     ports:
       - '80:80'

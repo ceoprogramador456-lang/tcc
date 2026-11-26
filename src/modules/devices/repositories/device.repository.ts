@@ -6,7 +6,9 @@ import type {
 import { env } from '../../../config/env.js';
 import { prisma } from '../../../database/prisma.js';
 import { createMockRepository } from '../../../shared/mock/create-mock-repository.js';
-import { devices as devicesMock } from '../../../shared/mock/mock-store.js';
+import { devices as devicesMock, sensors as sensorsMock } from '../../../shared/mock/mock-store.js';
+import { isPrismaError } from '../../../shared/errors/prisma-errors.js';
+import { ConflictError } from '../../../shared/errors/app-error.js';
 import type { Device } from '../entities/device.entity.js';
 import type { CreateDeviceDTO, UpdateDeviceDTO } from '../dtos/device.dtos.js';
 
@@ -15,11 +17,11 @@ export type CreateDeviceInput = CreateDeviceDTO & { tokenHash: string };
 
 export type DeviceRepository = CrudRepository<Device, CreateDeviceInput, UpdateDeviceDTO> & {
   findByTokenHash(tokenHash: string): Promise<Device | null>;
-  touchContact(id: number): Promise<void>;
 };
 
 function buildWhere(filter: Record<string, unknown>) {
   const where: Record<string, unknown> = {};
+  if (filter.espId !== undefined) where.espId = String(filter.espId);
   if (filter.id !== undefined) where.id = Number(filter.id);
   if (filter.setorId !== undefined) where.setorId = normalizeIdFilter(filter.setorId);
   if (filter.setorIds !== undefined) where.setorId = normalizeIdFilter(filter.setorIds);
@@ -67,20 +69,24 @@ const prismaRepository: DeviceRepository = {
     try {
       await prisma.esp32.delete({ where: { id: Number(id) } });
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (isPrismaError(error, 'P2025')) return false;
+      throw error;
     }
   },
   async findByTokenHash(tokenHash) {
     return prisma.esp32.findUnique({ where: { tokenHash } });
   },
-  async touchContact(id) {
-    await prisma.esp32.update({ where: { id }, data: { ultimoContato: new Date() } });
-  },
 };
 
 const mockRepository: DeviceRepository = {
   ...createMockRepository<Device, CreateDeviceInput, UpdateDeviceDTO>(devicesMock),
+  async remove(id) {
+    if (sensorsMock.findOne((sensor) => sensor.esp32Id === Number(id))) {
+      throw new ConflictError('O dispositivo possui sensores vinculados.');
+    }
+    return devicesMock.remove(Number(id));
+  },
   async create(data) {
     return devicesMock.create({
       ...data,
@@ -91,9 +97,6 @@ const mockRepository: DeviceRepository = {
   },
   async findByTokenHash(tokenHash) {
     return devicesMock.findOne((item) => item.tokenHash === tokenHash);
-  },
-  async touchContact(id) {
-    devicesMock.update(id, { ultimoContato: new Date() });
   },
 };
 

@@ -5,7 +5,7 @@ Este documento complementa a documentação interativa: com o servidor rodando, 
 ## Convenções
 
 - **Base URL**: todas as rotas de negócio ficam sob `/api` (ex.: `http://localhost:3000/api/sectors`). `/api/health` não exige autenticação.
-- **Formato de resposta** — toda resposta é um envelope JSON:
+- **Formato de resposta** — chamadas REST com corpo retornam um envelope JSON:
   ```json
   { "success": true, "data": { }, "meta": { } }
   ```
@@ -18,7 +18,7 @@ Este documento complementa a documentação interativa: com o servidor rodando, 
   - Cadastro: empresa SIVA aceita `ADMIN|TECNICO`; empresa cliente aceita somente `GESTOR`; todo usuário tem empresa.
 - **Autenticação** — duas formas, nunca misturadas na mesma rota (ver [AUTHENTICATION.md](./AUTHENTICATION.md) para o fluxo completo):
   - `Authorization: Bearer <jwt>` — usuários do dashboard.
-  - `X-Token: <token-do-dispositivo>` — só usado por `POST /api/readings` (o firmware do ESP32).
+  - `X-Token` autentica leituras, identificação da placa e confirmação de retirada. `X-Pairing-Secret` autentica a sessão temporária do ESP32.
 - **Content-Type**: `application/json` em todo request com corpo.
 
 ## Catálogo de endpoints
@@ -55,7 +55,8 @@ Este documento complementa a documentação interativa: com o servidor rodando, 
 | `DELETE` | `/api/assets/:id` | Bearer | `ADMIN`, `GESTOR` | Remove ativo |
 | `GET` | `/api/devices` | Bearer | — | Lista ESP32s (`?setorId=` ou `?empresaId=`; escopado; traz `online`) |
 | `GET` | `/api/devices/:id` | Bearer | — | Detalhe de um ESP32 (sem o token) |
-| `POST` | `/api/devices` | Bearer | `ADMIN`, `GESTOR` | Cria ESP32 — **token aparece só nesta resposta** (o banco guarda o hash) |
+| `GET` | `/api/devices/pending` | Bearer | `ADMIN`, `GESTOR` | Lista pendências da empresa. Rotas de descoberta e aprovação no [guia de pareamento](PAREAMENTO_ESP32.md). |
+| `GET` | `/api/devices/events` | Bearer | — | Stream SSE de mudanças visíveis ao usuário, com corpo `{}` por evento. |
 | `PATCH` | `/api/devices/:id` | Bearer | `ADMIN`, `GESTOR` | Edita ESP32 (descrição, esp_id, setor — nunca o token) |
 | `DELETE` | `/api/devices/:id` | Bearer | `ADMIN`, `GESTOR` | Remove ESP32 |
 | `GET` | `/api/sensors` | Bearer | — | Lista sensores (`?esp32Id=` `?ativoId=` `?empresaId=` `?ativoStatus=`) |
@@ -137,39 +138,9 @@ Content-Type: application/json
 
 Erros possíveis: `401 UNAUTHORIZED` (sem token), `403 FORBIDDEN` (usuário tentando criar setor em empresa que não é a sua), `422 VALIDATION_ERROR` (`nome` ausente/curto, `empresaId` ausente).
 
-### 3. Criar um ESP32 (token só aparece aqui)
+### 3. Aprovar um ESP32
 
-```http
-POST /api/devices
-Authorization: Bearer <jwt>
-Content-Type: application/json
-
-{ "setorId": 1, "espId": "esp_04", "descricao": "ESP32 da linha de envase" }
-```
-
-```json
-201 Created
-{
-  "success": true,
-  "data": {
-    "id": 4,
-    "setorId": 1,
-    "espId": "esp_04",
-    "token": "dev-7Kq2p1xN8vTn4wRb6mLc0hJ3sYd5fG",
-    "descricao": "ESP32 da linha de envase",
-    "ultimoContato": null,
-    "online": false,
-    "criadoEm": "2026-08-07T12:05:00.000Z"
-  }
-}
-```
-
-Guarde o `token` agora — nenhuma outra chamada (`GET /api/devices` ou `GET /api/devices/:id`) volta a mostrá-lo (ver [BUSINESS_FLOWS.md](./BUSINESS_FLOWS.md#fluxo-2--provisionamento-da-hierarquia-cadastro-inicial-de-uma-empresa)).
-
-> **Segurança (2026-10-21):** o banco guarda apenas o **hash SHA-256** do token
-> (`esp32.token_hash`). O valor em claro acima existe só nesta resposta — e o próprio
-> `tokenHash` nunca é devolvido pela API. O `online` é calculado a partir do
-> `ultimoContato` (janela de 10 minutos).
+A API recebe a descoberta da placa, verifica o código do OLED e vincula o primeiro sensor ao ativo escolhido. O equipamento retira a credencial com seu segredo temporário. Consulte os contratos no [guia de pareamento](PAREAMENTO_ESP32.md).
 
 ### 3.1 Listar dispositivos (escopo por empresa)
 

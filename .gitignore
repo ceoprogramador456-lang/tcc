@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 firmware/.pio/
+firmware/src/*.ino.cpp
 firmware/src/secrets.h
 .env
 .env.*.local

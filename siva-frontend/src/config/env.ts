@@ -5,7 +5,7 @@
  * definido aqui (o backend assina o JWT com `JWT_SECRET`, ver `src/config/env.ts`).
  */
 
-const DEFAULT_API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:3000/api';
+const DEFAULT_API_BASE_URL = '/api';
 
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();

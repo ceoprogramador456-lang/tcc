@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../../../utils/async-handler.js';
-import { created, noContent, ok, paginated } from '../../../shared/http/api-response.js';
+import { noContent, ok, paginated } from '../../../shared/http/api-response.js';
 import { parsePagination } from '../../../shared/http/pagination.js';
 import { toPublicDevice } from '../entities/device.entity.js';
 import { deviceService } from '../services/device.service.js';
@@ -19,12 +19,6 @@ export const deviceController = {
   getById: asyncHandler(async (req: Request, res: Response) => {
     const device = await deviceService.getAccessible(req.user!, Number(req.params.id));
     ok(res, toPublicDevice(device));
-  }),
-
-  create: asyncHandler(async (req: Request, res: Response) => {
-    // Token só é exposto na criação — trate como um segredo (como uma API key).
-    const device = await deviceService.create(req.user!, req.body);
-    created(res, device);
   }),
 
   update: asyncHandler(async (req: Request, res: Response) => {

@@ -158,6 +158,40 @@ class HttpClient {
     return this.request<never>('DELETE', path, undefined, options).then(() => undefined);
   }
 
+  async openEventStream(
+    path: string,
+    token: string,
+    signal: AbortSignal,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const handshake = new AbortController();
+    const timeout = setTimeout(() => {
+      handshake.abort(new DOMException('Tempo de resposta excedido.', 'TimeoutError'));
+    }, this.timeoutMs);
+
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
+        credentials: 'omit',
+        signal: AbortSignal.any([signal, handshake.signal]),
+      });
+      if (!response.ok) throw toApiError(response.status, await readPayload(response));
+      const contentType = response.headers.get('content-type')?.split(';')[0].trim();
+      if (!response.body || contentType !== 'text/event-stream') {
+        await response.body?.cancel();
+        throw new ApiError(
+          response.status,
+          'INVALID_RESPONSE',
+          'Fluxo de atualizações indisponível.',
+        );
+      }
+      return response.body;
+    } catch (error) {
+      throw normalizeError(error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private async request<T>(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,

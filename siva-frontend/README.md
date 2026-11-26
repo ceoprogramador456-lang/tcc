@@ -29,7 +29,7 @@ cd .. && npm run dev:mock     # http://localhost:3000, sem MySQL
 npm run dev                   # http://localhost:5173
 ```
 
-Configure a URL da API (padrão: `http://localhost:3000/api`):
+O painel acessa `/api` na mesma origem em desenvolvimento e produção. Durante o desenvolvimento, o Vite encaminha as chamadas para o backend local. Em produção, configure o proxy da aplicação para encaminhar essa rota à API. Se o backend usar outro domínio, defina `VITE_API_URL` com a URL HTTPS completa, incluindo `/api`, antes do build. Para personalizar a configuração local, copie o exemplo.
 
 ```bash
 cp .env.example .env
@@ -67,7 +67,7 @@ npm run preview   # serve o build de produção
 | `/painel` | GESTOR | Dashboard operacional (consumo, atividades) |
 | `/painel/setores` | GESTOR | Setores da empresa + ativos do setor |
 | `/painel/ativos` | GESTOR | Ativos, com vínculo por setor |
-| `/painel/esp32` | GESTOR | Dispositivos, comunicação e fluxo do token |
+| `/painel/esp32` | GESTOR | Dispositivos, comunicação e pareamento por código |
 | `/painel/sensores` | GESTOR | Sensores, ativação e estado de comunicação |
 | `/painel/solicitacoes` | GESTOR | Ordens de serviço da empresa |
 | `/painel/usuarios` | GESTOR | Equipe da própria empresa |
@@ -101,7 +101,7 @@ JWT em `localStorage` (chave `siva.auth.session`) e o descarta no logout.
 | Dashboard | `GET /api/dashboard/overview` (`?empresaId=`), `GET /api/dashboard/admin-summary` | overview: autenticado · admin-summary: ADMIN |
 | Setores | `GET /api/sectors?empresaId=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
 | Ativos | `GET /api/assets?empresaId=&setorId=&criticidade=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
-| ESP32 | `GET /api/devices?empresaId=&setorId=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
+| ESP32 | `GET /api/devices`, `GET /pending`, `POST /pairing/:id/approve`, `POST /pairing/:id/reject`, `POST /:id/revoke`, `PATCH /:id`, `DELETE /:id` | consulta de cadastrados para usuários autenticados · pareamento e gestão para ADMIN e GESTOR |
 | Sensores | `GET /api/sensors?empresaId=&ativoId=&esp32Id=&ativoStatus=`, `GET /:id`, `POST`, `PATCH /:id`, `DELETE /:id` | leitura: autenticado · escrita: ADMIN, GESTOR |
 | Empresas / Usuários | `GET/POST/PATCH/DELETE /api/companies`, `/api/users`, `PATCH /api/users/:id/status` | ver `docs/API.md` |
 | Ordens de serviço | `GET/POST /api/solicitacoes-servico`, `GET/PATCH /:id`, `POST /:id/aceitar`, `POST /:id/concluir` | GESTOR cria; ADMIN aceita/conclui; TECNICO vê só as suas |
@@ -114,14 +114,12 @@ Regras de negócio replicadas no front (o back-end continua sendo a fonte da ver
   campo de especialidade se atualizam;
 - e-mail duplicado → `409`; recursos com vínculos → `409` (usar inativação quando existir).
 
-## Token do ESP32
+## Parear um ESP32
 
-- O token é **gerado pelo servidor** (`randomBytes(24)`, ~192 bits) e devolvido **uma única
-  vez**, na resposta de criação.
-- O banco guarda apenas o **SHA-256** do token (`esp32.token_hash`); o hash nunca sai da API.
-- A tela de ESP32 exibe o token em um diálogo com botão de copiar e o aviso de exibição única.
-  Ao fechar, o valor sai do estado — a edição de um dispositivo **não** gera token novo.
-- Listagens e consultas **nunca** trazem o token (nem o hash).
+1. Abra **Dispositivos** com uma conta ADMIN ou GESTOR. Quando o ESP32 se conectar à API, a solicitação aparecerá em **Aguardando aprovação**. A tela atualiza essa lista a cada dez segundos após a resposta anterior.
+2. Confira o MAC, clique em **Conferir código** e digite os seis algarismos exibidos no OLED.
+3. Escolha o setor e o ativo monitorado, preencha o nome se desejar e clique em **Aprovar**. O dispositivo recebe a credencial diretamente da API e poderá enviar as leituras do sensor associado.
+4. Para interromper o acesso, use **Revogar credencial** na linha do equipamento. Um ESP32 com o firmware de pareamento poderá solicitar nova aprovação. Quando o cadastro veio do firmware manual, a migração para o novo pareamento cria outro cadastro.
 
 ## Estado de comunicação
 

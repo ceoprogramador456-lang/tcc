@@ -3,13 +3,12 @@ import type { ListOptions } from '../../../interfaces/repository.interface.js';
 import type { AuthenticatedDevice, AuthenticatedUser } from '../../../types/express.js';
 import { sensorService } from '../../sensors/services/sensor.service.js';
 import { createSensorRepository } from '../../sensors/repositories/sensor.repository.js';
-import { createDeviceRepository } from '../../devices/repositories/device.repository.js';
+import { recordDeviceContact } from '../../devices/services/device-events.service.js';
 import { createReadingRepository } from '../repositories/reading.repository.js';
 import type { IngestReadingDTO } from '../dtos/reading.dtos.js';
 
 const repository = createReadingRepository();
 const sensorRepository = createSensorRepository();
-const deviceRepository = createDeviceRepository();
 
 export const readingService = {
   async list(user: AuthenticatedUser, sensorId: number, options: ListOptions = {}) {
@@ -28,10 +27,14 @@ export const readingService = {
       throw new NotFoundError(`Sensor "${payload.sensor_id}" para o ESP32 "${payload.esp_id}"`);
     }
 
-    const [reading] = await Promise.all([
-      repository.create({ sensorId: sensor.id, vazao: payload.vazao }),
-      deviceRepository.touchContact(device.id),
-    ]);
-    return reading;
+    const result = await repository.ingest(device, { sensorId: sensor.id, vazao: payload.vazao });
+    recordDeviceContact(
+      device.id,
+      result.setorId,
+      result.empresaId,
+      result.contact,
+      result.wasOnline,
+    );
+    return result.reading;
   },
 };

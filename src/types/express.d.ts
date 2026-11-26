@@ -16,11 +16,13 @@ export interface AuthenticatedDevice {
   id: number;
   espId: string;
   setorId: number;
+  tokenHash: string;
 }
 
 declare module 'express-serve-static-core' {
   interface Request {
     user?: AuthenticatedUser;
+    userSessionExpiresAt?: number;
     device?: AuthenticatedDevice;
     log: Logger;
   }

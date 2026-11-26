@@ -22,9 +22,9 @@ export async function authenticateUser(
     throw new UnauthorizedError('Token de autenticação ausente.');
   }
 
-  let claims: AuthenticatedUser;
+  let claims: AuthenticatedUser & jwt.JwtPayload;
   try {
-    claims = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser;
+    claims = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser & jwt.JwtPayload;
   } catch {
     throw new UnauthorizedError('Token de autenticação inválido ou expirado.');
   }
@@ -35,6 +35,7 @@ export async function authenticateUser(
     throw new ForbiddenError('Usuário inativo. Entre em contato com o administrador.');
   }
 
+  req.userSessionExpiresAt = claims.exp === undefined ? undefined : claims.exp * 1000;
   req.user = {
     id: user.id,
     email: user.email,
@@ -81,7 +82,7 @@ export async function authenticateDevice(
   }
 
   const device = await findDeviceByTokenHash(hashDeviceToken(value));
-  if (!device) {
+  if (!device || device.revokedAt) {
     throw new UnauthorizedError('X-Token inválido.');
   }
 
@@ -89,6 +90,7 @@ export async function authenticateDevice(
     id: device.id,
     espId: device.espId,
     setorId: device.setorId,
+    tokenHash: device.tokenHash,
   } satisfies AuthenticatedDevice;
   next();
 }

@@ -13,7 +13,12 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     const durationMs = Date.now() - start;
     const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
     req.log[level](
-      { method: req.method, url: req.originalUrl, statusCode: res.statusCode, durationMs },
+      {
+        method: req.method,
+        url: req.originalUrl.split('?', 1)[0],
+        statusCode: res.statusCode,
+        durationMs,
+      },
       'request',
     );
   });

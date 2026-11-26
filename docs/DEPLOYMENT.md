@@ -50,11 +50,10 @@ docker compose up --build
 
 ### `docker-compose.enterprise.yml` — topologia de produção/homologação
 
-Adiciona um [Caddy](https://caddyserver.com/) como reverse proxy na frente da API (TLS automático via [`Caddyfile`](../Caddyfile)) e exige `MYSQL_ROOT_PASSWORD`/`JWT_SECRET` explícitos (o compose falha a subir sem eles — `${VAR:?mensagem}`, de propósito, para não deixar rodar com segredo default). Ver ⚠️ gap de `trust proxy` nessa topologia em [SECURITY.md](./SECURITY.md#rate-limiting) antes de usar isso com tráfego real.
+O Caddy termina o TLS no domínio configurado em `SIVA_API_DOMAIN`. O serviço `migrate` aplica as migrações com a versão de Prisma do projeto antes de a API iniciar. A API é privada e confia em um salto de proxy nessa topologia. Configure `MYSQL_ROOT_PASSWORD`, `JWT_SECRET`, `PAIRING_COMPANY_ID` e `PAIRING_KEY` na instalação. [Configuração e pareamento](PAREAMENTO_ESP32.md)
 
 ```bash
-export MYSQL_ROOT_PASSWORD=<segredo-forte>
-export JWT_SECRET=<segredo-forte>
+# Configure as variáveis no .env privado da instalação (veja .env.example).
 docker compose -f docker-compose.enterprise.yml up -d --build
 ```
 

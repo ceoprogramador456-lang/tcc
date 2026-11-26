@@ -7,10 +7,7 @@ import { createSectorRepository } from '../../sectors/repositories/sector.reposi
 import { createAssetRepository } from '../../assets/repositories/asset.repository.js';
 import { createSensorRepository } from '../../sensors/repositories/sensor.repository.js';
 import { createDeviceRepository } from '../repositories/device.repository.js';
-import { toPublicDevice } from '../entities/device.entity.js';
-import type { CreatedDevice } from '../entities/device.entity.js';
-import type { CreateDeviceDTO, UpdateDeviceDTO } from '../dtos/device.dtos.js';
-import { generateDeviceToken, hashDeviceToken } from '../../../utils/device-token.js';
+import type { UpdateDeviceDTO } from '../dtos/device.dtos.js';
 
 const repository = createDeviceRepository();
 
@@ -67,25 +64,11 @@ export const deviceService = {
     return device;
   },
 
-  /**
-   * Cria o dispositivo e devolve o token **uma única vez**.
-   *
-   * O token em claro é gerado aqui, devolvido ao cliente nesta resposta e
-   * apenas o hash SHA-256 é persistido.
-   */
-  async create(user: AuthenticatedUser, data: CreateDeviceDTO): Promise<CreatedDevice> {
-    await sectorService.getAccessible(user, data.setorId);
-    await this.assertEspIdAvailable(data.espId);
-
-    const token = generateDeviceToken();
-    const device = await repository.create({ ...data, tokenHash: hashDeviceToken(token) });
-    return { ...toPublicDevice(device), token };
-  },
-
   async update(user: AuthenticatedUser, id: number, data: UpdateDeviceDTO) {
     const current = await this.getAccessible(user, id);
 
     if (data.espId !== undefined && data.espId !== current.espId) {
+      if (current.mac) throw new ConflictError('O identificador de um ESP32 pareado é permanente.');
       await this.assertEspIdAvailable(data.espId, id);
     }
 
@@ -94,7 +77,6 @@ export const deviceService = {
       await this.assertSensoresNoSetorDestino(id, data.setorId);
     }
 
-    // O token nunca é alterado por edição — trocar exige recriar o dispositivo.
     const device = await repository.update(id, data);
     if (!device) throw new NotFoundError('Dispositivo ESP32');
     return device;
@@ -102,7 +84,7 @@ export const deviceService = {
 
   async remove(user: AuthenticatedUser, id: number) {
     await this.getAccessible(user, id);
-    await repository.remove(id);
+    if (!(await repository.remove(id))) throw new NotFoundError('Dispositivo ESP32');
   },
 
   async assertEspIdAvailable(espId: string, ignoreId?: number): Promise<void> {

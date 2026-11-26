@@ -73,6 +73,7 @@ model Empresa {
   usuarios      Usuario[]
   setores       Setor[]
   ordemServicos OrdemServico[]
+  pareamentos   PairingSession[]
 
   @@map("empresa")
 }
@@ -133,15 +134,19 @@ model Ativo {
 }
 
 model Esp32 {
-  id            Int       @id @default(autoincrement())
-  setorId       Int       @map("setor_id")
-  espId         String    @unique @map("esp_id") @db.VarChar(50)
-  tokenHash     String    @unique @map("token_hash") @db.Char(64)
-  descricao     String?   @db.VarChar(100)
-  ultimoContato DateTime? @map("ultimo_contato")
-  criadoEm      DateTime  @default(now()) @map("criado_em")
+  id             Int       @id @default(autoincrement())
+  setorId        Int       @map("setor_id")
+  espId          String    @unique @map("esp_id") @db.VarChar(50)
+  mac            String?   @unique @db.Char(17)
+  revokedAt      DateTime? @map("revoked_at")
+  model          String?   @db.VarChar(64)
+  firmwareVersion String?  @map("firmware_version") @db.VarChar(32)
+  tokenHash      String    @unique @map("token_hash") @db.Char(64)
+  descricao      String?   @db.VarChar(100)
+  ultimoContato  DateTime? @map("ultimo_contato")
+  criadoEm       DateTime  @default(now()) @map("criado_em")
 
-  setor    Setor    @relation(fields: [setorId], references: [id])
+  setor   Setor    @relation(fields: [setorId], references: [id])
   sensores Sensor[]
 
   @@map("esp32")
@@ -226,4 +231,21 @@ model OrdemServico {
   @@index([status], name: "idx_ordem_servico_status")
   @@index([empresaId], name: "idx_ordem_servico_empresa")
   @@map("ordem_servico")
+}
+
+model PairingSession {
+  id              String   @id @db.Char(36)
+  mac             String   @unique @db.Char(17)
+  empresaId       Int      @map("empresa_id")
+  firmwareVersion String   @map("firmware_version") @db.VarChar(32)
+  model           String   @db.VarChar(64)
+  sensorId        String   @map("sensor_id") @db.VarChar(50)
+  secretHash      String   @map("secret_hash") @db.Char(64)
+  state           String   @db.VarChar(12)
+  attempts        Int      @default(0)
+  expiresAt       DateTime @map("expires_at")
+  empresa         Empresa  @relation(fields: [empresaId], references: [id])
+
+  @@index([empresaId, state, expiresAt])
+  @@map("device_pairing")
 }

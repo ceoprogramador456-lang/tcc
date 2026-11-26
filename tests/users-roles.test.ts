@@ -455,16 +455,16 @@ describe('EMPRESAS + DASHBOARD', () => {
 });
 
 describe('ESP32 / SENSORES preservados', () => {
-  it('POST /devices retorna token uma vez; GET não retorna', async () => {
+  it('orienta o administrador a usar o pareamento e preserva a consulta do legado', async () => {
     const created = await request(app)
       .post('/api/devices')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ setorId: 1, espId: 'esp_teste_99', descricao: 'teste' });
-    expect(created.status).toBe(201);
-    expect(created.body.data.token).toEqual(expect.any(String));
+      .send({ setorId: 1, espId: 'esp_teste_99' });
+    expect(created.status).toBe(410);
+    expect(created.body.data?.token).toBeUndefined();
 
     const fetched = await request(app)
-      .get(`/api/devices/${created.body.data.id}`)
+      .get('/api/devices/1')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(fetched.status).toBe(200);
     expect(fetched.body.data.token).toBeUndefined();

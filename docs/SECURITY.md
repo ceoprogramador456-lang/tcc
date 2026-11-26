@@ -6,7 +6,7 @@ Este documento é deliberadamente honesto: lista o que está implementado **e** 
 
 - Implementado: `express-rate-limit` global, aplicado a **todas** as rotas (`src/app.ts`), configurável via `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` (default: 100 requisições/minuto por IP).
 - ⚠️ **Gap**: não há limite específico para `POST /api/auth/login`. O limite genérico não impede um brute-force lento e distribuído contra a senha de um usuário específico, e não há bloqueio de conta após N tentativas falhas.
-- ⚠️ **Gap**: o app nunca chama `app.set('trust proxy', ...)`. Atrás de um reverse proxy (o `Caddyfile`/`docker-compose.enterprise.yml` deste repo colocam um na frente), `req.ip` passa a ser sempre o IP do proxy, não o do cliente — o rate limit vira, na prática, um balde único compartilhado por todos os usuários reais. Precisa ser corrigido antes de usar essa topologia em produção.
+- O compose de produção define `TRUST_PROXY_HOPS=1` para o Caddy e mantém a API na rede privada. Em uma instalação sem proxy, use o padrão `0`.
 
 ## Helmet
 
@@ -36,26 +36,15 @@ Este documento é deliberadamente honesto: lista o que está implementado **e** 
 - Sem política de complexidade de senha além do mínimo de 8 caracteres (`z.string().min(8)`).
 - 🚧 Sem MFA/2FA, sem expiração de senha, sem histórico de senhas usadas.
 
-## Credenciais de dispositivo (X-Token)
+## Credenciais de dispositivo
 
-- ✅ **Resolvido 2026-10-21**: o `token` do ESP32 não é mais gravado em texto plano. A coluna
-  passou a ser `esp32.token_hash CHAR(64)` (SHA-256 do token) e o token em claro **só é
-  devolvido na resposta de criação** (`POST /api/devices`). O `authenticateDevice` calcula o
-  hash do `X-Token` recebido e busca pelo hash — um vazamento do banco não permite mais forjar
-  um header válido. Migration: `db/migrations/002_device_token_hash.sql`.
-- O token é gerado com `randomBytes(24)` (`crypto`), em base64url — ~192 bits de entropia.
-  Antes era `Math.random()`, que é previsível. Prefixo `dev-` mantido para suporte.
-- O hash também é sensível: `toPublicDevice` o remove da representação pública, então nem
-  o hash sai do back-end.
-- O token não expira e não pode ser rotacionado via API (só recriando o dispositivo). A
-  edição de um dispositivo **nunca** gera um token novo.
-- Limitação restante: o `X-Token` é de conhecimento do dispositivo — quem o obtiver pode
-  injetar leituras. Uma rotação programável e expiração continuam fora do escopo.
+A API verifica o hash SHA-256 da credencial e a revogação antes de aceitar leituras. A entrega pelo endpoint de retirada exige o segredo temporário da placa e HTTPS em produção. Códigos de confirmação expiram e têm tentativas limitadas. [Pareamento, configuração e revogação](PAREAMENTO_ESP32.md)
 
-## Segredos (JWT_SECRET)
+O stream de dispositivos exige JWT no cabeçalho `Authorization`. A API confere papel e empresa ao enviar eventos e encerra a conexão se a autorização expirar ou mudar. As notificações contêm apenas o tipo do evento e um objeto vazio. Os dados do equipamento vêm das rotas REST com as permissões habituais.
 
-- ⚠️ **Gap grave**: [`src/config/env.ts`](../src/config/env.ts) define um valor **padrão e público** para `JWT_SECRET` (`troque-este-valor-em-producao`, o mesmo texto que está no `.env.example` deste repositório). Nada no código impede a API de subir em `NODE_ENV=production` sem essa variável explicitamente definida. Se isso acontecer, qualquer pessoa que leia o repositório consegue forjar um JWT válido de `super_admin`.
-  - **Mitigação recomendada**: falhar o boot (`process.exit(1)` ou lançar na validação do `env.ts`) quando `NODE_ENV=production` e `JWT_SECRET` não foi setado explicitamente (hoje o schema Zod não diferencia "não setado, caiu no default" de "setado igual ao default").
+## Segredos de produção
+
+Configure `JWT_SECRET` com um segredo aleatório de produção e `PAIRING_KEY` com 32 bytes aleatórios em hexadecimal. Guarde as duas chaves fora do repositório. A API usa a primeira para autenticar usuários e a segunda para o pareamento. [Configuração](PAREAMENTO_ESP32.md)
 
 ## Isolamento entre tenants
 
@@ -82,16 +71,16 @@ Este documento é deliberadamente honesto: lista o que está implementado **e** 
 | --- | --- |
 | Rate limit global | ✅ implementado |
 | Rate limit específico de login / lockout de conta | 🚧 não implementado |
-| `trust proxy` correto atrás de reverse proxy | ⚠️ não configurado |
+| Proxy confiável | Um salto no compose com Caddy, API em rede privada |
 | Helmet | ✅ implementado (config padrão) |
 | CORS configurável | ✅ implementado |
 | Validação de entrada (Zod) em toda rota | ✅ implementado |
 | SQL Injection (Prisma parametrizado) | ✅ mitigado por padrão |
 | XSS (API só JSON) | ✅ não aplicável nesta camada |
 | Senha com hash forte (bcrypt) | ✅ implementado |
-| Token de dispositivo com hash | ⚠️ texto plano hoje |
-| `esp32.token` único | ✅ implementado |
-| `JWT_SECRET` obrigatório em produção | ⚠️ tem default inseguro |
+| Token de dispositivo com hash | SHA-256 e revogação por dispositivo |
+| `esp32.token_hash` único | ✅ implementado |
+| `JWT_SECRET` de produção | Configuração específica da instalação |
 | Isolamento entre empresas (leitura/escrita) | ✅ implementado |
 | Isolamento entre empresas (não vazar existência via 403 vs 404) | ⚠️ gap conhecido |
 | Erros inesperados não vazam stack em produção | ✅ implementado |

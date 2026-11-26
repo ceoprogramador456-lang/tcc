@@ -8,6 +8,12 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((value) => value === 'true'),
+  PAIRING_COMPANY_ID: z.coerce.number().int().positive().optional(),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(1).default(0),
+  PAIRING_KEY: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/i)
+    .optional(),
   DATABASE_URL: z.string().optional(),
   JWT_SECRET: z.string().min(8).default('troque-este-valor-em-producao'),
   JWT_EXPIRES_IN: z.string().default('8h'),
@@ -27,6 +33,16 @@ if (!parsed.success) {
 if (!parsed.data.MOCK_MODE && !parsed.data.DATABASE_URL) {
   console.error('DATABASE_URL é obrigatório quando MOCK_MODE=false.');
   throw new Error('Falha ao carregar configuração de ambiente.');
+}
+
+if (parsed.data.NODE_ENV === 'production') {
+  if (parsed.data.MOCK_MODE) throw new Error('MOCK_MODE deve ser false em produção.');
+  if (
+    parsed.data.JWT_SECRET.trim().length < 32 ||
+    parsed.data.JWT_SECRET === 'troque-este-valor-em-producao'
+  ) {
+    throw new Error('Configure JWT_SECRET com pelo menos 32 caracteres exclusivos em produção.');
+  }
 }
 
 export const env = parsed.data;

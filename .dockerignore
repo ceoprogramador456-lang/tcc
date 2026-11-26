@@ -3,5 +3,7 @@ dist
 coverage
 .env
 .env.*.local
+firmware/src/secrets.h
+firmware/.pio
 *.log
 .git

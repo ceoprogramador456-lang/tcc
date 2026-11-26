@@ -1,11 +1,16 @@
-# Substitua pelo domínio real da API em produção.
-:80 {
+{$SIVA_API_DOMAIN} {
 	encode gzip
 
 	reverse_proxy api:3000
 
 	log {
 		output stdout
-		format console
+		format filter {
+			wrap console
+			fields {
+				request>headers>X-Token delete
+				request>headers>X-Pairing-Secret delete
+			}
+		}
 	}
 }

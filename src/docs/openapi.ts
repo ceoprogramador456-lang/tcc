@@ -1,6 +1,63 @@
 const bearerAuth = { bearerAuth: [] as string[] };
 const xTokenAuth = { xTokenAuth: [] as string[] };
 
+const pairingSecretAuth = { pairingAuth: [] as string[] };
+const textField = { type: 'string' };
+const numberField = { type: 'integer' };
+const dateTime = { type: 'string', format: 'date-time' };
+const sessionId = { type: 'string', format: 'uuid' };
+const code = { type: 'string', pattern: '^[0-9]{6}$' };
+const identity = {
+  mac: textField,
+  firmwareVersion: textField,
+  model: textField,
+  sensorId: textField,
+};
+const pendingDevice = {
+  type: 'object',
+  properties: {
+    ...identity,
+    id: sessionId,
+    empresaId: numberField,
+    expiresAt: dateTime,
+    setorId: numberField,
+    ativoId: numberField,
+  },
+};
+const pairingId = { name: 'id', in: 'path', required: true, schema: sessionId };
+const approvalFields = { code, setorId: numberField, descricao: textField };
+const newAsset = {
+  type: 'object',
+  required: ['nome'],
+  additionalProperties: false,
+  properties: { nome: { type: 'string', minLength: 2, maxLength: 100 } },
+};
+
+function jsonBody(properties: Record<string, object>, required = Object.keys(properties)) {
+  return {
+    required: true,
+    content: { 'application/json': { schema: { type: 'object', properties, required } } },
+  };
+}
+
+function dataResponse(data: object) {
+  return {
+    '200': {
+      description: 'OK',
+      content: {
+        'application/json': {
+          schema: { type: 'object', properties: { success: { type: 'boolean' }, data } },
+        },
+      },
+    },
+  };
+}
+
+const pairingApi = { tags: ['Devices'], security: [pairingSecretAuth] };
+const deviceApi = { tags: ['Devices'], security: [xTokenAuth] };
+const managerApi = { tags: ['Devices'], security: [bearerAuth] };
+const noContentResponse = { '204': { description: 'Operação concluída.' } };
+
 const idParam = {
   name: 'id',
   in: 'path' as const,
@@ -78,6 +135,7 @@ export const openApiDocument = {
   components: {
     securitySchemes: {
       bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      pairingAuth: { type: 'apiKey', in: 'header', name: 'X-Pairing-Secret' },
       xTokenAuth: { type: 'apiKey', in: 'header', name: 'X-Token' },
     },
     schemas: {
@@ -127,28 +185,16 @@ export const openApiDocument = {
           setorId: { type: 'integer' },
           espId: { type: 'string' },
           descricao: { type: 'string', nullable: true },
-          ultimoContato: { type: 'string', format: 'date-time', nullable: true },
+          ultimoContato: { ...dateTime, nullable: true },
+          revokedAt: { ...dateTime, nullable: true },
+          mac: { ...textField, nullable: true },
+          model: { ...textField, nullable: true },
+          firmwareVersion: { ...textField, nullable: true },
           online: {
             type: 'boolean',
             description: 'Verdadeiro quando houve leitura nos últimos 10 minutos.',
           },
           criadoEm: { type: 'string', format: 'date-time' },
-        },
-      },
-      CreatedDevice: {
-        type: 'object',
-        description:
-          'Resposta de criação. O `token` é devolvido em texto plano uma única vez — ' +
-          'o banco guarda apenas o hash SHA-256.',
-        properties: {
-          id: { type: 'integer' },
-          setorId: { type: 'integer' },
-          espId: { type: 'string' },
-          descricao: { type: 'string', nullable: true },
-          ultimoContato: { type: 'string', format: 'date-time', nullable: true },
-          online: { type: 'boolean' },
-          criadoEm: { type: 'string', format: 'date-time' },
-          token: { type: 'string' },
         },
       },
       Sensor: {
@@ -480,9 +526,135 @@ export const openApiDocument = {
       },
       post: {
         tags: ['Devices'],
-        summary: 'Cadastra um ESP32 e gera seu X-Token (exibido só na criação).',
+        deprecated: true,
+        summary: 'Cadastro manual encerrado. Use o pareamento.',
         security: [bearerAuth],
-        responses: { '201': itemResponse('#/components/schemas/CreatedDevice') },
+        responses: { '410': { description: 'Utilize o pareamento da placa.' } },
+      },
+    },
+    '/devices/discovery': {
+      post: {
+        ...pairingApi,
+        summary: 'Inicia ou retoma o pareamento',
+        requestBody: jsonBody(identity),
+        responses: dataResponse({
+          type: 'object',
+          properties: { sessionId, code, expiresAt: dateTime },
+        }),
+      },
+    },
+    '/devices/pending': {
+      get: {
+        ...managerApi,
+        summary: 'Lista as pendências visíveis à empresa',
+        responses: dataResponse({ type: 'array', items: pendingDevice }),
+      },
+    },
+    '/devices/events': {
+      get: {
+        tags: ['Devices'],
+        security: [bearerAuth],
+        summary: 'Notifica alterações de dispositivos visíveis ao usuário',
+        description:
+          'Stream SSE. Eventos de pareamento exigem ADMIN ou GESTOR. Eventos de comunicação também são enviados a técnicos no escopo da empresa. O corpo de cada evento é {}.',
+        responses: {
+          '200': {
+            description: 'Stream de eventos',
+            content: { 'text/event-stream': { schema: textField } },
+          },
+          '401': { description: 'Sessão ausente ou inválida' },
+          '429': { description: 'Limite de conexões atingido' },
+        },
+      },
+    },
+    '/devices/pairing/{id}/approve': {
+      post: {
+        ...managerApi,
+        summary: 'Confirma o código e vincula o sensor ao ativo',
+        parameters: [pairingId],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                oneOf: [
+                  {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: { ...approvalFields, ativoId: numberField },
+                    required: ['code', 'setorId', 'ativoId'],
+                  },
+                  {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: { ...approvalFields, novoAtivo: newAsset },
+                    required: ['code', 'setorId', 'novoAtivo'],
+                  },
+                ],
+              },
+            },
+          },
+        },
+        responses: {
+          '200': itemResponse('#/components/schemas/Device'),
+          '409': { description: 'Pareamento encerrado, vínculo em conflito ou ativo já existente' },
+          '410': { description: 'Código expirado' },
+        },
+      },
+    },
+    '/devices/pairing/{id}/reject': {
+      post: {
+        ...managerApi,
+        summary: 'Rejeita a solicitação',
+        parameters: [pairingId],
+        responses: noContentResponse,
+      },
+    },
+    '/devices/pairing/status': {
+      post: {
+        ...pairingApi,
+        summary: 'Consulta o estado da sessão',
+        requestBody: jsonBody({ sessionId }),
+        responses: dataResponse({
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['pending', 'approved', 'rejected', 'expired'] },
+          },
+        }),
+      },
+    },
+    '/devices/credentials': {
+      post: {
+        ...pairingApi,
+        summary: 'Entrega a credencial à placa',
+        requestBody: jsonBody({ sessionId }),
+        responses: dataResponse({
+          type: 'object',
+          properties: { token: textField, espId: textField },
+        }),
+      },
+    },
+    '/devices/pairing/ack': {
+      post: {
+        ...deviceApi,
+        summary: 'Confirma a persistência em NVS',
+        requestBody: jsonBody({ sessionId }),
+        responses: noContentResponse,
+      },
+    },
+    '/devices/me': {
+      get: {
+        ...deviceApi,
+        summary: 'Autentica a placa',
+        responses: dataResponse({ type: 'object', properties: { espId: textField } }),
+      },
+    },
+    '/devices/{id}/revoke': {
+      post: {
+        ...managerApi,
+        summary: 'Revoga a credencial individual',
+        parameters: [idParam],
+        responses: noContentResponse,
       },
     },
     '/sensors': {

@@ -40,6 +40,7 @@ function toErrorMessage(error: unknown): string {
 export function useAsyncData<T>(
   loader: () => Promise<T>,
   reloadKey: string | number = 0,
+  pollIntervalMs?: number,
 ): AsyncDataResult<T> {
   const loaderRef = useRef(loader);
   const [state, setState] = useState<AsyncDataState<T>>({
@@ -59,26 +60,34 @@ export function useAsyncData<T>(
     let cancelled = false;
     const requestedKey = effectiveKey;
 
-    loaderRef
-      .current()
-      .then((data) => {
-        if (cancelled) return;
-        setState({ data, error: null, loadedKey: requestedKey, scopeKey: reloadKey });
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setState((current) => ({
-          data: current.scopeKey === reloadKey ? current.data : null,
-          error: toErrorMessage(error),
-          loadedKey: requestedKey,
-          scopeKey: reloadKey,
-        }));
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function load() {
+      loaderRef
+        .current()
+        .then((data) => {
+          if (cancelled) return;
+          setState({ data, error: null, loadedKey: requestedKey, scopeKey: reloadKey });
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          setState((current) => ({
+            data: current.scopeKey === reloadKey ? current.data : null,
+            error: toErrorMessage(error),
+            loadedKey: requestedKey,
+            scopeKey: reloadKey,
+          }));
+        })
+        .finally(() => {
+          if (!cancelled && pollIntervalMs) timer = setTimeout(load, pollIntervalMs);
+        });
+    }
+    load();
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [effectiveKey, reloadKey]);
+  }, [effectiveKey, reloadKey, pollIntervalMs]);
 
   const reload = useCallback(() => {
     setReloadToken((current) => current + 1);

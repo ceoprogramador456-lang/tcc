@@ -1,12 +1,8 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-
-// O banco guarda apenas o hash SHA-256 do token; o firmware usa o valor em claro.
-const hashToken = (token: string): string =>
-  createHash('sha256').update(token, 'utf8').digest('hex');
 
 const prisma = new PrismaClient();
 const seedConfigSchema = z.object({
@@ -131,7 +127,8 @@ async function main(): Promise<void> {
     create: {
       setorId: setor.id,
       espId: 'esp_01',
-      tokenHash: hashToken('dev-token-esp01'),
+      tokenHash: randomBytes(32).toString('hex'),
+      revokedAt: new Date(),
       descricao: 'ESP32 de produção',
     },
   });

@@ -16,6 +16,8 @@ if (!email || !senha) {
 }
 
 async function main(email: string, senha: string): Promise<void> {
+  const passwordHash = await bcrypt.hash(senha, 12);
+
   // ADMIN pertence à SIVA (empresa dona do sistema). Cria a empresa caso o
   // banco ainda não tenha sido migrado/seedado.
   const siva = await prisma.empresa.upsert({
@@ -27,7 +29,7 @@ async function main(email: string, senha: string): Promise<void> {
   const user = await prisma.usuario.upsert({
     where: { email },
     update: {
-      senha: bcrypt.hashSync(senha, 12),
+      senha: passwordHash,
       tipo: 'ADMIN',
       especialidade: null,
       empresaId: siva.id,
@@ -35,7 +37,7 @@ async function main(email: string, senha: string): Promise<void> {
     create: {
       nome: 'Administrador SIVA',
       email,
-      senha: bcrypt.hashSync(senha, 12),
+      senha: passwordHash,
       tipo: 'ADMIN',
       especialidade: null,
       status: 'ATIVO',

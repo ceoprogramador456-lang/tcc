@@ -7,7 +7,7 @@ O sistema tem **dois mecanismos de autenticação independentes**, para dois tip
 | Credencial | e-mail + senha → JWT | `token` fixo gerado no cadastro |
 | Header | `Authorization: Bearer <jwt>` | `X-Token: <token>` |
 | Middleware | [`authenticateUser`](../src/middlewares/auth.middleware.ts) | [`authenticateDevice`](../src/middlewares/auth.middleware.ts) |
-| Usado em | quase todas as rotas de `/api` | só `POST /api/readings` |
+| Usado em | quase todas as rotas de `/api` | leituras, identificação e confirmação de persistência |
 | Identifica | uma pessoa, com papel (`tipo`) e empresa | um ESP32 específico, com setor |
 
 Os dois nunca se misturam na mesma rota — ver a lista completa em [API.md](./API.md#catálogo-de-endpoints).
@@ -68,30 +68,9 @@ Aplicado em duas camadas, sempre nessa ordem:
 
 Para recursos que não têm `empresaId` direto (ativo, ESP32, sensor, leitura, manutenção), a checagem "sobe" a cadeia da hierarquia até achar o setor e, a partir dele, a empresa — ver o diagrama em [ARCHITECTURE.md](./ARCHITECTURE.md#multi-tenant-como-o-isolamento-entre-empresas-é-aplicado).
 
-## Autenticação de dispositivo (X-Token)
+## Autenticação de dispositivo
 
-```mermaid
-sequenceDiagram
-    participant FW as Firmware ESP32
-    participant API as API
-    FW->>API: POST /api/readings<br/>X-Token: dev-token-esp01
-    API->>API: findByToken(token) na tabela esp32
-    alt não encontrado
-        API-->>FW: 401 UNAUTHORIZED
-    else encontrado
-        API->>API: req.device = { id, espId, setorId }
-        API-->>FW: 201 Created
-    end
-```
-
-- O `token` é gerado pelo backend no momento do `POST /api/devices` (não é escolhido pelo cliente) e só aparece **naquela** resposta — ver [API.md](./API.md#3-criar-um-esp32-token-só-aparece-aqui).
-- **Armazenamento por hash (2026-10-21)**: o banco guarda apenas o SHA-256 do token
-  (`esp32.token_hash CHAR(64)`). O `authenticateDevice` calcula o hash do `X-Token` recebido e
-  busca pelo hash. O token é gerado com `randomBytes(24)` (entropia criptográfica) e o hash
-  nunca sai do back-end. Migration: `db/migrations/002_device_token_hash.sql`.
-- Não tem validade (não expira sozinho) nem escopo de permissão — um X-Token válido só serve para uma coisa: `POST /api/readings` em nome daquele ESP32 específico.
-- `authenticateDevice` não usa JWT nem assinatura: é uma busca pelo hash do token na tabela `esp32` (`findUnique`). O hash serve de indexador único, então a comparação não é por igualdade sobre o segredo em si.
-- O estado **online/offline** de um dispositivo deriva de `esp32.ultimo_contato`, atualizado a cada leitura aceita. A janela usada pelo back-end é de 10 minutos (`DEVICE_ONLINE_WINDOW_MS`): acima disso, o dispositivo é considerado offline — estar cadastrado não significa estar online.
+O ESP32 gera um segredo temporário e o apresenta por HTTPS em `X-Pairing-Secret`. O usuário aprova a associação entre sensor e ativo com o código do OLED. A placa retira a credencial, grava-a em NVS e confirma a gravação. O middleware de dispositivo verifica o hash do `X-Token` e o estado de revogação. O painel permite revogar a credencial mantendo o histórico do sensor. [Contrato e recuperação](PAREAMENTO_ESP32.md)
 
 ## Registro e troca de senha
 

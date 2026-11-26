@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import { rateLimit } from 'express-rate-limit';
+import { AppError } from './shared/errors/app-error.js';
 import { env } from './config/env.js';
 import { requestLogger } from './middlewares/request-logger.middleware.js';
 import { errorHandler } from './middlewares/error-handler.middleware.js';
@@ -15,6 +16,7 @@ export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -37,6 +39,13 @@ export function createApp() {
       legacyHeaders: false,
     }),
   );
+
+  if (env.NODE_ENV === 'production') {
+    app.use(['/api/devices', '/api/readings'], (req, _res, next) => {
+      if (!req.secure) throw new AppError('HTTPS obrigatório.', 403, 'HTTPS_REQUIRED');
+      next();
+    });
+  }
 
   app.use('/docs', docsRoutes);
   app.use('/api', apiRoutes);

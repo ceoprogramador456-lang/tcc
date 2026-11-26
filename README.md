@@ -147,10 +147,9 @@ autenticado por `X-Token`) sem hardware:
 npm run simulate:esp32
 ```
 
-```bash
-# Firmware
-# Abrir main.ino na Arduino IDE, configurar Wi-Fi em wifi_manager.h e fazer upload para o ESP32
-```
+### Pareando um ESP32
+
+Ligue a placa com o firmware configurado para a API HTTPS. Na página **Dispositivos**, confira o código do OLED, escolha o setor e selecione ou crie o ativo que recebe o sensor. Após a aprovação, o ESP32 salva a credencial em NVS e começa a enviar leituras. Consulte o [guia de instalação, pareamento e recuperação](docs/PAREAMENTO_ESP32.md).
 
 ## 📜 Scripts disponíveis
 

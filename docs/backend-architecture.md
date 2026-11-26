@@ -1,6 +1,6 @@
 # SIVA — Arquitetura do Backend
 
-> Documento central de arquitetura. Gerado a partir da análise do código existente em `src/`, `prisma/schema.prisma`, `package.json`, `Dockerfile`, `docker-compose.yml` e `docs/`.
+> Este levantamento e o arquivo `backend-functionalities.json` registram uma versão anterior do backend. Para o contrato atual de dispositivos, a autenticação e o modelo de pareamento, consulte o [guia do ESP32](PAREAMENTO_ESP32.md) e o [catálogo da API](API.md).
 > Convenções: `[EXISTENTE]`, `[NECESSÁRIO IMPLEMENTAR]`, `[NECESSITA DEFINIÇÃO]`.
 > Regra: não inventar regra de negócio — o que não está no código está marcado.
 

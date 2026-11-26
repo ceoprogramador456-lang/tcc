@@ -8,7 +8,7 @@ namespace {
 volatile uint32_t pulseCount = 0;
 
 void IRAM_ATTR onFlowPulse() {
-  pulseCount++;
+  pulseCount = pulseCount + 1;
 }
 }  // namespace
 

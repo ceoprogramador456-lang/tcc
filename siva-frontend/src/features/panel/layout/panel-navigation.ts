@@ -39,7 +39,7 @@ export const PANEL_NAV_ITEMS: PanelNavItem[] = [
   {
     to: '/painel/esp32',
     label: 'Dispositivos',
-    description: 'Aparelhos que enviam as leituras',
+    description: 'Pareamento e comunicação dos ESP32',
     icon: Radio,
   },
   {

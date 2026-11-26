@@ -4,16 +4,14 @@ import { AlertMessage } from '../../../../components/ui/AlertMessage';
 import { Button } from '../../../../components/ui/Button';
 import { InputField, SelectField } from '../../../../components/ui/FormField';
 import { Modal } from '../../../../components/ui/Modal';
-import type { CreateDevicePayload, Device } from '../../../../types/device';
+import type { UpdateDevicePayload, Device } from '../../../../types/device';
 import type { Sector } from '../../../../types/sector';
 
 interface DeviceFormDialogProps {
-  open: boolean;
-  /** `null` para criação; um dispositivo para edição. */
-  device: Device | null;
+  device: Device;
   sectors: Sector[];
   onClose: () => void;
-  onSubmit: (payload: CreateDevicePayload) => Promise<void>;
+  onSubmit: (payload: UpdateDevicePayload) => Promise<void>;
 }
 
 const FIELD_MESSAGES: Record<string, string> = {
@@ -22,31 +20,10 @@ const FIELD_MESSAGES: Record<string, string> = {
   setorId: 'Selecione o setor do dispositivo.',
 };
 
-export function DeviceFormDialog({
-  open,
-  device,
-  sectors,
-  onClose,
-  onSubmit,
-}: DeviceFormDialogProps) {
-  return (
-    <DeviceFormDialogBody
-      key={`${device?.id ?? 'novo'}-${open ? 'aberto' : 'fechado'}`}
-      open={open}
-      device={device}
-      sectors={sectors}
-      onClose={onClose}
-      onSubmit={onSubmit}
-    />
-  );
-}
-
-function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: DeviceFormDialogProps) {
-  const isEditing = device !== null;
-
-  const [setorId, setSetorId] = useState(device ? String(device.setorId) : '');
-  const [espId, setEspId] = useState(device?.espId ?? '');
-  const [descricao, setDescricao] = useState(device?.descricao ?? '');
+export function DeviceFormDialog({ device, sectors, onClose, onSubmit }: DeviceFormDialogProps) {
+  const [setorId, setSetorId] = useState(String(device.setorId));
+  const [espId, setEspId] = useState(device.espId);
+  const [descricao, setDescricao] = useState(device.descricao ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +46,7 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
     try {
       await onSubmit({
         setorId: Number(setorId),
-        espId: trimmedEspId,
+        ...(device.mac ? {} : { espId: trimmedEspId }),
         descricao: descricao.trim().length > 0 ? descricao.trim() : null,
       });
     } catch (error: unknown) {
@@ -83,14 +60,9 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
-      title={isEditing ? 'Editar dispositivo' : 'Cadastrar dispositivo'}
-      description={
-        isEditing
-          ? 'O token de acesso do firmware não é alterado aqui — nem reaparece após a criação.'
-          : 'O token de acesso é gerado pelo servidor e exibido uma única vez, ao final do cadastro.'
-      }
+      title="Editar dispositivo ESP32"
       size="sm"
       footer={
         <>
@@ -98,7 +70,7 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
             Cancelar
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={isSaving}>
-            {isSaving ? 'Salvando…' : isEditing ? 'Salvar alterações' : 'Cadastrar dispositivo'}
+            {isSaving ? 'Salvando…' : 'Salvar alterações'}
           </Button>
         </>
       }
@@ -115,7 +87,7 @@ function DeviceFormDialogBody({ open, device, sectors, onClose, onSubmit }: Devi
           error={errors.espId}
           placeholder="esp_01"
           hint="Usado no payload enviado pelo firmware."
-          disabled={isSaving}
+          disabled={isSaving || Boolean(device.mac)}
         />
 
         <SelectField

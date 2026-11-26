@@ -19,6 +19,7 @@ interface BaseFieldProps {
 interface InputFieldProps extends BaseFieldProps {
   type?: 'text' | 'email' | 'password' | 'number';
   autoComplete?: string;
+  inputMode?: React.InputHTMLAttributes<HTMLInputElement>['inputMode'];
   min?: number;
   max?: number;
 }
@@ -35,6 +36,7 @@ export function InputField({
   name,
   type = 'text',
   autoComplete,
+  inputMode,
   min,
   max,
   className,
@@ -57,6 +59,7 @@ export function InputField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
+        inputMode={inputMode}
         placeholder={placeholder}
         disabled={disabled}
         required={required}

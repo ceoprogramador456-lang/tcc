@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pencil, Plus, Radio, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { KeyRound, Pencil, Radio, RefreshCw, Trash2 } from 'lucide-react';
 
 import { AlertMessage } from '../../../components/ui/AlertMessage';
 import { Badge } from '../../../components/ui/Badge';
@@ -12,9 +12,10 @@ import { LoadingBlock } from '../../../components/ui/LoadingBlock';
 import { Pagination } from '../../../components/ui/Pagination';
 import { SelectField } from '../../../components/ui/FormField';
 import { useAsyncData } from '../../../hooks/use-async-data';
+import { allPages } from '../../../services/api/all-pages';
 import { deviceService } from '../../../services/devices/device.service';
 import { sectorService } from '../../../services/sectors/sector.service';
-import type { CreateDevicePayload, Device } from '../../../types/device';
+import type { Device, UpdateDevicePayload } from '../../../types/device';
 import type { Sector } from '../../../types/sector';
 import { formatDateTime } from '../../../utils/format';
 import { useAuthenticatedSession } from '../../auth/hooks/use-authenticated-session';
@@ -23,41 +24,54 @@ import { usePanelLayout } from '../layout/panel-layout-context';
 import { usePanelScope } from '../hooks/use-panel-scope';
 import { usePermissions } from '../hooks/use-permissions';
 import { DeviceFormDialog } from './components/DeviceFormDialog';
-import { DeviceTokenDialog } from './components/DeviceTokenDialog';
+import { PendingDevices } from './components/PendingDevices';
+import { useDeviceEvents } from './use-device-events';
+import type { AuthenticatedSession } from '../../auth/hooks/use-authenticated-session';
 
 const PAGE_SIZE = 10;
 
 export default function DevicesPage() {
-  const { openMenu } = usePanelLayout();
   const session = useAuthenticatedSession();
-  const { empresaId } = usePanelScope();
+  const { empresaId: selectedCompany } = usePanelScope();
+  if (!session) return null;
+  const empresaId = session.user.tipo === 'ADMIN' ? selectedCompany : session.user.empresaId;
+  return (
+    <DevicesPanel key={`${session.token}:${empresaId}`} session={session} empresaId={empresaId} />
+  );
+}
+
+function DevicesPanel({
+  session,
+  empresaId,
+}: {
+  session: AuthenticatedSession;
+  empresaId: number | null;
+}) {
+  const { openMenu } = usePanelLayout();
   const { canWrite } = usePermissions();
 
   const [page, setPage] = useState(1);
   const [filterSetorId, setFilterSetorId] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [pendingRefresh, setPendingRefresh] = useState(0);
   const [editing, setEditing] = useState<Device | null>(null);
-  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    device: Device;
+    action: 'delete' | 'revoke';
+  } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [revealedToken, setRevealedToken] = useState<{ token: string; espId: string } | null>(null);
-
-  const { data: sectors } = useAsyncData(
-    () => {
-      if (!session) return Promise.reject(new Error('Sessão expirada.'));
-      return sectorService.list(session.token, {
-        page: 1,
-        pageSize: 100,
-        empresaId: empresaId ?? undefined,
-      });
-    },
-    `${session?.token ?? ''}:${empresaId ?? 'todas'}`,
+  const { data: sectors, error: sectorsError } = useAsyncData(
+    () =>
+      allPages((currentPage) =>
+        sectorService.list(session.token, { page: currentPage, pageSize: 100, empresaId }),
+      ),
+    refresh,
   );
 
   const { data, isLoading, error, reload } = useAsyncData(
     () => {
-      if (!session) return Promise.reject(new Error('Sessão expirada.'));
       return deviceService.list(session.token, {
         page,
         pageSize: PAGE_SIZE,
@@ -66,46 +80,43 @@ export default function DevicesPage() {
       });
     },
     `${session?.token ?? ''}:${page}:${empresaId ?? 'todas'}:${filterSetorId}`,
+    30_000,
   );
 
-  if (!session) return null;
+  const reloadPending = useCallback(() => setPendingRefresh((value) => value + 1), []);
+  useDeviceEvents(session.token, reload, reloadPending);
 
   const sectorName = new Map<number, string>(
-    (sectors?.items ?? []).map((sector: Sector) => [sector.id, sector.nome]),
+    (sectors ?? []).map((sector: Sector) => [sector.id, sector.nome]),
   );
 
-  const handleSubmit = async (payload: CreateDevicePayload): Promise<void> => {
-    if (editing) {
-      await deviceService.update(session.token, editing.id, payload);
-      setActionSuccess(`Dispositivo "${payload.espId}" atualizado.`);
-      setIsFormOpen(false);
-    } else {
-      // O token volta uma única vez, na resposta de criação.
-      const created = await deviceService.create(session.token, payload);
-      setActionSuccess(`Dispositivo "${created.espId}" cadastrado.`);
-      setIsFormOpen(false);
-      setRevealedToken({ token: created.token, espId: created.espId });
-    }
+  const handleSubmit = async (payload: UpdateDevicePayload): Promise<void> => {
+    if (!editing) return;
+    await deviceService.update(session.token, editing.id, payload);
+    setActionSuccess(`Dispositivo "${editing.espId}" atualizado.`);
+    setEditing(null);
     reload();
   };
 
-  const handleDelete = async (): Promise<void> => {
-    if (!deviceToDelete) return;
-
+  const confirmAction = async (): Promise<void> => {
+    if (!confirmation || isDeleting) return;
+    const { device, action } = confirmation;
     setIsDeleting(true);
     setActionError(null);
+    setActionSuccess(null);
     try {
-      await deviceService.remove(session.token, deviceToDelete.id);
-      setActionSuccess(`Dispositivo "${deviceToDelete.espId}" excluído.`);
-      setDeviceToDelete(null);
+      if (action === 'revoke') {
+        await deviceService.revoke(session.token, device.id);
+        setActionSuccess(`Credencial de "${device.espId}" revogada.`);
+      } else {
+        await deviceService.remove(session.token, device.id);
+        setActionSuccess(`Dispositivo "${device.espId}" excluído.`);
+      }
       reload();
-    } catch (deleteError: unknown) {
-      setActionError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : 'Não foi possível excluir o dispositivo.',
-      );
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'Falha ao atualizar o dispositivo.');
     } finally {
+      setConfirmation(null);
       setIsDeleting(false);
     }
   };
@@ -140,8 +151,8 @@ export default function DevicesPage() {
       header: 'Comunicação',
       render: (device) => (
         <div className="flex flex-col items-start gap-1">
-          <Badge tone={device.online ? 'success' : 'warning'}>
-            {device.online ? 'Online' : 'Offline'}
+          <Badge tone={device.revokedAt ? 'danger' : device.online ? 'success' : 'warning'}>
+            {device.revokedAt ? 'Credencial revogada' : device.online ? 'Online' : 'Offline'}
           </Badge>
           <span className="text-xs text-slate-500">
             {device.ultimoContato
@@ -168,7 +179,6 @@ export default function DevicesPage() {
               onClick={() => {
                 setEditing(device);
                 setActionError(null);
-                setIsFormOpen(true);
               }}
               className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-siva-50 hover:text-bright-teal-blue"
               aria-label={`Editar ${device.espId}`}
@@ -176,9 +186,20 @@ export default function DevicesPage() {
             >
               <Pencil className="size-4" aria-hidden="true" />
             </button>
+            {!device.revokedAt && (
+              <button
+                type="button"
+                onClick={() => setConfirmation({ device, action: 'revoke' })}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                aria-label={`Revogar credencial de ${device.espId}`}
+                title="Revogar credencial"
+              >
+                <KeyRound className="size-4" aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setDeviceToDelete(device)}
+              onClick={() => setConfirmation({ device, action: 'delete' })}
               className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
               aria-label={`Excluir ${device.espId}`}
               title="Excluir"
@@ -194,31 +215,25 @@ export default function DevicesPage() {
     <>
       <PanelTopbar
         title="Dispositivos"
-        description="Consulte os aparelhos que enviam leituras e configure sua identificação"
+        description="Pareamento e comunicação dos ESP32"
         onOpenMenu={openMenu}
         showScopeSelector
         actions={
-          <>
-            <Button variant="outline" onClick={reload} disabled={isLoading}>
-              <RefreshCw
-                className={isLoading ? 'size-4 animate-spin' : 'size-4'}
-                aria-hidden="true"
-              />
-              Atualizar
-            </Button>
-            {canWrite ? (
-              <Button
-                onClick={() => {
-                  setEditing(null);
-                  setActionError(null);
-                  setIsFormOpen(true);
-                }}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                Cadastrar dispositivo
-              </Button>
-            ) : null}
-          </>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setRefresh((value) => value + 1);
+              reloadPending();
+              reload();
+            }}
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={isLoading ? 'size-4 animate-spin' : 'size-4'}
+              aria-hidden="true"
+            />
+            Atualizar
+          </Button>
         }
       />
 
@@ -231,6 +246,16 @@ export default function DevicesPage() {
           </AlertMessage>
         ) : null}
 
+        {sectorsError && <AlertMessage tone="danger">{sectorsError}</AlertMessage>}
+        {canWrite && (
+          <PendingDevices
+            token={session.token}
+            empresaId={empresaId}
+            sectors={sectors ?? []}
+            refresh={pendingRefresh}
+            onApproved={reload}
+          />
+        )}
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <SelectField
@@ -242,7 +267,7 @@ export default function DevicesPage() {
                 setPage(1);
               }}
               placeholder="Todos os setores"
-              options={(sectors?.items ?? []).map((sector) => ({
+              options={(sectors ?? []).map((sector) => ({
                 value: String(sector.id),
                 label: sector.nome,
               }))}
@@ -277,7 +302,7 @@ export default function DevicesPage() {
                 <EmptyState
                   icon={Radio}
                   title="Nenhum dispositivo encontrado"
-                  description="Cadastre um dispositivo e vincule seus sensores para receber leituras de vazão."
+                  description="Os equipamentos cadastrados nos setores selecionados aparecem aqui."
                 />
               }
             />
@@ -295,29 +320,33 @@ export default function DevicesPage() {
         </div>
       </div>
 
-      <DeviceFormDialog
-        open={isFormOpen}
-        device={editing}
-        sectors={sectors?.items ?? []}
-        onClose={() => setIsFormOpen(false)}
-        onSubmit={handleSubmit}
-      />
-
-      <DeviceTokenDialog
-        open={revealedToken !== null}
-        token={revealedToken?.token ?? null}
-        espId={revealedToken?.espId ?? null}
-        onClose={() => setRevealedToken(null)}
-      />
-
+      {editing && (
+        <DeviceFormDialog
+          key={editing.id}
+          device={editing}
+          sectors={sectors ?? []}
+          onClose={() => setEditing(null)}
+          onSubmit={handleSubmit}
+        />
+      )}
       <ConfirmDialog
-        open={deviceToDelete !== null}
-        title="Excluir dispositivo"
-        description={`O dispositivo "${deviceToDelete?.espId ?? ''}" será removido permanentemente. Dispositivos com sensores vinculados não podem ser excluídos — nesse caso, o servidor recusará a operação.`}
-        confirmLabel="Excluir"
+        open={confirmation !== null}
+        title={confirmation?.action === 'revoke' ? 'Revogar credencial' : 'Excluir dispositivo'}
+        description={
+          confirmation?.action === 'revoke'
+            ? `O ESP32 ${confirmation.device.espId} perderá o acesso imediatamente. ${
+                confirmation.device.mac
+                  ? 'Aprove um novo pareamento para retomar o envio de leituras.'
+                  : 'Este cadastro usa o firmware manual. A migração para o novo pareamento criará outro cadastro.'
+              }`
+            : `O dispositivo "${confirmation?.device.espId ?? ''}" será removido permanentemente. Dispositivos com sensores vinculados precisam manter o histórico.`
+        }
+        confirmLabel={confirmation?.action === 'revoke' ? 'Revogar' : 'Excluir'}
         isLoading={isDeleting}
-        onConfirm={() => void handleDelete()}
-        onCancel={() => setDeviceToDelete(null)}
+        onConfirm={() => void confirmAction()}
+        onCancel={() => {
+          if (!isDeleting) setConfirmation(null);
+        }}
       />
     </>
   );

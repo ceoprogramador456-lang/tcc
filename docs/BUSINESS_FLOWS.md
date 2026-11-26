@@ -37,10 +37,10 @@ flowchart LR
     A["1. POST /companies<br/>(super_admin)"] --> B["2. POST /users<br/>cria admin_empresa da empresa"]
     B --> C["3. POST /sectors<br/>(empresaId)"]
     C --> D["4. POST /assets<br/>(setorId)"]
-    C --> E["4. POST /devices<br/>(setorId) → gera token X-Token"]
-    D --> F["5. POST /sensors<br/>(ativoId + esp32Id)"]
+    C --> E["4. ESP32 solicita pareamento"]
+    D --> F["5. Gestor confirma o OLED e vincula o sensor ao ativo"]
     E --> F
-    F --> G["6. Firmware do ESP32 já pode<br/>enviar leituras (POST /readings, X-Token)"]
+    F --> G["6. ESP32 guarda a credencial e envia leituras"]
 ```
 
 Passo 5 tem uma regra que não é óbvia pelo desenho: **o `ativo` e o `esp32` informados precisam pertencer ao mesmo `setor`** (checado em [`sensor.service.ts`](../src/modules/sensors/services/sensor.service.ts) antes do `create` — lança `ValidationError` 422 se não pertencerem). Isso existe porque um sensor fisicamente conecta um equipamento a uma central de comunicação que está no mesmo ambiente; não faz sentido vincular um ativo do setor "Produção" a um ESP32 do setor "Limpeza".
@@ -141,7 +141,7 @@ flowchart LR
 
 ### ESP32 (device)
 - Pertence a exatamente um setor; `esp_id` único (identificador usado pelo firmware) e `token` único (credencial do header `X-Token`).
-- O `token` só é retornado no corpo da resposta de **criação** — chamadas subsequentes (`list`/`getById`) nunca expõem o token de volta (ver [`toPublicDevice`](../src/modules/devices/entities/device.entity.ts)).
+- O ESP32 retira sua credencial por HTTPS usando o segredo temporário da sessão. [Fluxo de pareamento](PAREAMENTO_ESP32.md)
 
 ### Sensor
 - Vincula um `ativo` a um `esp32`; ambos precisam já existir e **pertencer ao mesmo setor** (regra do Fluxo 2).

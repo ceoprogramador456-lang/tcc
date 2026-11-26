@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { closeDeviceEventStreams } from './modules/devices/services/device-events.service.js';
 import { disconnectDatabase } from './database/prisma.js';
 
 const app = createApp();
@@ -14,6 +15,7 @@ const server = app.listen(env.PORT, () => {
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'Encerrando servidor...');
+  closeDeviceEventStreams();
   server.close(async () => {
     await disconnectDatabase();
     process.exit(0);

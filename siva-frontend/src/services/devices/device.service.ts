@@ -1,8 +1,9 @@
 import { httpClient } from '../api/http-client';
 import type { PaginatedResult, QueryParams } from '../../types/api';
 import type {
-  CreateDevicePayload,
-  CreatedDevice,
+  ApproveDevicePayload,
+  DeviceEvent,
+  PendingDevice,
   Device,
   UpdateDevicePayload,
 } from '../../types/device';
@@ -14,17 +15,49 @@ export interface ListDevicesParams {
   empresaId?: number | null;
 }
 
-/**
- * Operações de dispositivo ESP32.
- *
- * Contrato confirmado no back-end (`src/modules/devices`):
- *  - `GET    /api/devices?empresaId=&setorId=` → já escopado pela empresa do ator;
- *  - `GET    /api/devices/:id` → dispositivo (sem token);
- *  - `POST   /api/devices`     → cria (ADMIN, GESTOR) e devolve o **token uma única vez**;
- *  - `PATCH  /api/devices/:id` → edita (ADMIN, GESTOR) — o token não é alterado;
- *  - `DELETE /api/devices/:id` → remove (ADMIN, GESTOR).
- */
+const DEVICE_EVENTS: ReadonlySet<string> = new Set<DeviceEvent>([
+  'device:discovered',
+  'device:approved',
+  'device:rejected',
+  'device:revoked',
+  'device:online',
+  'device:offline',
+]);
+
 export const deviceService = {
+  async watch(
+    token: string,
+    signal: AbortSignal,
+    onConnect: () => void,
+    onEvent: (event: DeviceEvent) => void,
+  ): Promise<void> {
+    const stream = await httpClient.openEventStream('/devices/events', token, signal);
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      onConnect();
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) return;
+        const frames = (buffer + decoder.decode(value, { stream: true })).split(/\r?\n\r?\n/);
+        buffer = frames.pop() ?? '';
+        if (buffer.length > 16_384) {
+          await reader.cancel();
+          return;
+        }
+        for (const frame of frames) {
+          const field = frame.split(/\r?\n/).find((line) => line.startsWith('event:'));
+          const event = field?.slice('event:'.length).trim();
+          if (event && DEVICE_EVENTS.has(event)) onEvent(event as DeviceEvent);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+
   list(token: string, params: ListDevicesParams = {}): Promise<PaginatedResult<Device>> {
     const query: QueryParams = {
       page: params.page,
@@ -39,8 +72,24 @@ export const deviceService = {
     return httpClient.get<Device>(`/devices/${id}`, { token });
   },
 
-  create(token: string, payload: CreateDevicePayload): Promise<CreatedDevice> {
-    return httpClient.post<CreatedDevice>('/devices', payload, { token });
+  pending(token: string): Promise<PendingDevice[]> {
+    return httpClient.get<PendingDevice[]>('/devices/pending', { token });
+  },
+
+  approve(token: string, id: string, payload: ApproveDevicePayload): Promise<void> {
+    return httpClient.post(`/devices/pairing/${encodeURIComponent(id)}/approve`, payload, {
+      token,
+    });
+  },
+
+  reject(token: string, id: string): Promise<void> {
+    return httpClient.post(`/devices/pairing/${encodeURIComponent(id)}/reject`, undefined, {
+      token,
+    });
+  },
+
+  revoke(token: string, id: number): Promise<void> {
+    return httpClient.post(`/devices/${id}/revoke`, undefined, { token });
   },
 
   update(token: string, id: number, payload: UpdateDevicePayload): Promise<Device> {

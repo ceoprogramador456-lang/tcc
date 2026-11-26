@@ -74,7 +74,7 @@ Trocar `JWT_SECRET` **invalida instantaneamente todos os JWTs emitidos antes da 
 3. Reinicie a API (ver seção acima).
 4. Comunique aos usuários que vão precisar logar novamente.
 
-Rotação de `token` de um ESP32 específico (sem o gap de suspeita de vazamento geral): não há endpoint de "regenerar token" — hoje a única forma é remover o dispositivo (`DELETE /api/devices/:id`) e recriá-lo (`POST /api/devices`), o que também exige reconfigurar o firmware daquele ESP32 com o novo token.
+Para substituir a credencial, use **Revogar** na página Dispositivos e aprove a nova sessão do equipamento com o código do OLED. O setor, o ativo e o sensor permitem recuperar o vínculo das placas já pareadas. Confira o procedimento para equipamentos legados no [guia de pareamento](PAREAMENTO_ESP32.md).
 
 ## Resposta a incidente (checklist geral)
 

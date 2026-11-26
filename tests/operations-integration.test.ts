@@ -1,8 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { createDeviceRepository } from '../src/modules/devices/repositories/device.repository.js';
-import { hashDeviceToken } from '../src/utils/device-token.js';
 
 const app = createApp();
 
@@ -16,33 +14,6 @@ async function tokenDe(email: string, senha: string): Promise<string> {
 }
 
 describe('Token do dispositivo ESP32', () => {
-  it('persiste apenas o hash do token — o valor em claro não vai para o banco', async () => {
-    const token = await tokenDe(ADMIN.email, ADMIN.senha);
-
-    const response = await request(app)
-      .post('/api/devices')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ setorId: 1, espId: 'esp_hash_teste', descricao: 'Teste de hash' });
-
-    expect(response.status).toBe(201);
-    expect(typeof response.body.data.token).toBe('string');
-    expect(response.body.data.token).toMatch(/^dev-/);
-
-    const repository = createDeviceRepository();
-    const devices = await repository.list({
-      page: 1,
-      pageSize: 100,
-      filter: { espId: 'esp_hash_teste' },
-    });
-    const device = devices.items[0];
-
-    expect(device).toBeDefined();
-    if (!device) throw new Error('dispositivo de teste não foi criado');
-    expect(device.tokenHash).toBe(hashDeviceToken(response.body.data.token));
-    expect(device.tokenHash).not.toBe(response.body.data.token);
-    expect(JSON.stringify(device)).not.toContain(response.body.data.token);
-  });
-
   it('não devolve o token (nem o hash) em listagens ou consultas', async () => {
     const token = await tokenDe(ADMIN.email, ADMIN.senha);
 
@@ -61,42 +32,6 @@ describe('Token do dispositivo ESP32', () => {
     expect(single.status).toBe(200);
     expect(single.body.data.token).toBeUndefined();
     expect(single.body.data.tokenHash).toBeUndefined();
-  });
-
-  it('o token devolvido na criação autentica a ingestão via X-Token', async () => {
-    const token = await tokenDe(ADMIN.email, ADMIN.senha);
-
-    const created = await request(app)
-      .post('/api/devices')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ setorId: 1, espId: 'esp_x_token', descricao: 'Teste X-Token' });
-
-    const deviceToken = created.body.data.token as string;
-    const sensor = await request(app)
-      .post('/api/sensors')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ativoId: 1, esp32Id: created.body.data.id, sensorId: 'sensor_xt' });
-
-    expect(sensor.status).toBe(201);
-
-    const reading = await request(app)
-      .post('/api/readings')
-      .set('X-Token', deviceToken)
-      .send({ esp_id: 'esp_x_token', sensor_id: 'sensor_xt', vazao: 5 });
-
-    expect(reading.status).toBe(201);
-  });
-
-  it('recusa esp_id duplicado com 409', async () => {
-    const token = await tokenDe(ADMIN.email, ADMIN.senha);
-
-    const response = await request(app)
-      .post('/api/devices')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ setorId: 1, espId: 'esp_01' });
-
-    expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('CONFLICT');
   });
 
   it('informa o estado online/offline a partir do último contato', async () => {

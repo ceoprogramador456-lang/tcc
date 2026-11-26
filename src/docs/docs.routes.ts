@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import express from 'express';
-import path from 'node:path';
 import swaggerUiDist from 'swagger-ui-dist';
 import { openApiDocument } from './openapi.js';
 

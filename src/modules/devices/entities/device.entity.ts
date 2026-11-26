@@ -4,6 +4,10 @@ export interface Device {
   espId: string;
   /** SHA-256 do token de acesso — o token em claro nunca é persistido. */
   tokenHash: string;
+  mac?: string | null;
+  revokedAt?: Date | null;
+  model?: string | null;
+  firmwareVersion?: string | null;
   descricao: string | null;
   ultimoContato: Date | null;
   criadoEm: Date;
@@ -18,26 +22,22 @@ export const DEVICE_ONLINE_WINDOW_MS = 10 * 60 * 1000;
 
 export type PublicDevice = Omit<Device, 'tokenHash'> & { online: boolean };
 
-/** Resposta de criação: o token em claro é entregue uma única vez. */
-export interface CreatedDevice extends PublicDevice {
-  token: string;
-}
-
 export function isDeviceOnline(
-  device: Pick<Device, 'ultimoContato'>,
+  device: Pick<Device, 'ultimoContato' | 'revokedAt'>,
   now: Date = new Date(),
 ): boolean {
-  if (!device.ultimoContato) return false;
+  if (device.revokedAt || !device.ultimoContato) return false;
   return now.getTime() - new Date(device.ultimoContato).getTime() <= DEVICE_ONLINE_WINDOW_MS;
 }
 
-/**
- * Remove o hash do token da representação pública.
- *
- * O hash também é sensível: com ele, um vazamento do banco permitiria forjar
- * um header `X-Token` válido. Ele nunca sai do back-end.
- */
 export function toPublicDevice(device: Device): PublicDevice {
   const { tokenHash: _tokenHash, ...publicDevice } = device;
-  return { ...publicDevice, online: isDeviceOnline(device) };
+  return {
+    mac: null,
+    model: null,
+    firmwareVersion: null,
+    revokedAt: null,
+    ...publicDevice,
+    online: isDeviceOnline(device),
+  };
 }
